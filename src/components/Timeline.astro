@@ -1,0 +1,134 @@
+---
+import { Rocket, Check } from "lucide-react";
+
+// Timeline/Roadmap Section Component
+const timeline = [
+  {
+    status: 'completed',
+    title: 'MVP Release',
+    date: 'Available Now',
+    items: [
+      'Instant Interactive UI for testing any Anchor program',
+      'Automatic derivation of basic + complex PDA',
+      'Account suggestions based on recently used ones'
+    ]
+  },
+  {
+    status: 'completed',
+    title: 'v0.2.0',
+    date: 'Oct 28, 2025',
+    items: [
+      'Session sharing with non-technical team members',
+      'Hot reloading for instant UI updates'
+    ]
+  },
+  {
+    status: 'upcoming',
+    title: 'Enhanced Features',
+    date: 'Q1 2026',
+    items: [
+      'Export to automated test suites',
+      'Test scenarios recording and playback',
+      'Transaction State Visualizer',
+      'Multi-signature transaction testing',
+      'State Assertion Builder',
+      'CI/CD Integration',
+      'Automated Vulnerability Scanning',
+    ]
+  }
+];
+---
+
+<section class="py-20 bg-gray-900">
+  <div class="container mx-auto px-6">
+    <!-- Section Header -->
+    <div class="text-center max-w-3xl mx-auto mb-16">
+      <h2 class="text-4xl md:text-5xl font-bold text-white mb-4">
+        Release <span class="text-brand">Timeline</span>
+      </h2>
+      <p class="text-xl text-gray-300">
+        See what's available now and what's coming next
+      </p>
+    </div>
+
+    <!-- Timeline -->
+    <div class="max-w-4xl mx-auto">
+      <div class="relative">
+        <!-- Timeline Line -->
+        <div class="hidden md:block absolute left-1/2 transform -translate-x-1/2 w-1 h-full" style="background: linear-gradient(to bottom, #5e17eb, #a0f0d0);"></div>
+
+        <!-- Timeline Items -->
+        {timeline.map((item, index) => (
+          <div class={`relative mb-12 ${index % 2 === 0 ? 'md:pr-1/2' : 'md:pl-1/2'}`}>
+            <div class={`md:flex ${index % 2 === 0 ? 'md:flex-row-reverse' : ''} items-center`}>
+              <!-- Timeline Dot -->
+              <div class="hidden md:flex absolute left-1/2 transform -translate-x-1/2 w-8 h-8 rounded-full border-4 border-gray-900 items-center justify-center z-10"
+                   style={item.status === 'completed' ? 'background-color: #5e17eb;' : 'background-color: #a0f0d0;'}>
+                {item.status === 'completed' && (
+                  <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </div>
+
+              <!-- Content Card -->
+              <div class={`md:w-1/2 ${index % 2 === 0 ? 'md:pr-12 md:text-right' : 'md:pl-12'}`}>
+                <div class="bg-gray-800 border-2 border-gray-700 rounded-xl p-6 shadow-lg hover:shadow-xl hover:shadow-green-500/10 transition">
+                  <div class="flex items-center gap-2 mb-2"
+                       class:list={[
+                         index % 2 === 0 ? 'md:justify-end' : ''
+                       ]}>
+                    <span class="px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2"
+                          class:list={[
+                            item.status === 'completed' ? 'bg-green-900/30' : 'bg-green-900/30'
+                          ]}
+                          class="text-brand">
+                      {item.status === 'upcoming' ? <Rocket className="w-4 h-4" strokeWidth={1.5} /> : <Check className="w-4 h-4" strokeWidth={1.5} />}
+                      {item.status === 'completed' ? 'Live' : ' Coming Soon'}
+                    </span>
+                  </div>
+                  <h3 class="text-2xl font-bold text-white mb-1">{item.title}</h3>
+                  <p class="font-medium mb-4 text-brand">{item.date}</p>
+                  <ul class="space-y-2"
+                      class:list={[
+                        index % 2 === 0 ? 'md:text-right' : ''
+                      ]}>
+                    {item.items.map((feature) => (
+                      <li class="flex items-start gap-2"
+                          class:list={[
+                            index % 2 === 0 ? 'md:flex-row-reverse md:justify-end' : ''
+                          ]}>
+                        <svg class="w-5 h-5 mt-0.5 flex-shrink-0 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span class="text-gray-300">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="text-center mt-16">
+      <p class="text-gray-400 mb-6">
+        Want to contribute or suggest features?
+      </p>
+      <a 
+        href="https://github.com/blockchain-hq/x402test/discussions" 
+        target="_blank"
+        class="inline-flex items-center gap-2 px-8 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition font-medium border-2 border-gray-700"
+      >
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+          <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" />
+        </svg>
+        Join the Discussion
+      </a>
+    </div>
+  </div>
+</section>
+

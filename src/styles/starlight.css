@@ -1,0 +1,254 @@
+/* Starlight custom styles for x402test */
+
+/* Brand colors - purple/green gradient theme */
+:root {
+  --sl-color-accent-low: 94, 23, 235;
+  --sl-color-accent: 138, 180, 248;
+  --sl-color-accent-high: 224, 241, 255;
+  --sl-color-white: 255, 255, 255;
+  --sl-color-gray-1: 23, 25, 35;
+  --sl-color-gray-2: 33, 39, 55;
+  --sl-color-gray-3: 52, 63, 96;
+  --sl-color-gray-4: 69, 84, 124;
+  --sl-color-gray-5: 138, 180, 248;
+  --sl-color-gray-6: 224, 241, 255;
+  --sl-color-black: 17, 24, 39;
+}
+
+/* Dark theme (default) */
+[data-theme="dark"] {
+  --sl-color-accent-low: 94, 23, 235;
+  --sl-color-accent: 138, 180, 248;
+  --sl-color-accent-high: 224, 241, 255;
+  --sl-color-white: 255, 255, 255;
+  --sl-color-gray-1: 23, 25, 35;
+  --sl-color-gray-2: 33, 39, 55;
+  --sl-color-gray-3: 52, 63, 96;
+  --sl-color-gray-4: 69, 84, 124;
+  --sl-color-gray-5: 138, 180, 248;
+  --sl-color-gray-6: 224, 241, 255;
+  --sl-color-black: 17, 24, 39;
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --sl-color-accent-low: 224, 241, 255;
+  --sl-color-accent: 94, 23, 235;
+  --sl-color-accent-high: 138, 180, 248;
+  --sl-color-black: 17, 24, 39;
+  --sl-color-white: 255, 255, 255;
+  --sl-color-gray-1: 238, 242, 247;
+  --sl-color-gray-2: 224, 231, 239;
+  --sl-color-gray-3: 196, 208, 221;
+  --sl-color-gray-4: 148, 167, 187;
+  --sl-color-gray-5: 100, 116, 139;
+  --sl-color-gray-6: 71, 85, 105;
+}
+
+/* Header background */
+.header {
+  background-color: rgba(var(--sl-color-gray-1), 0.95) !important;
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(var(--sl-color-gray-2), 0.5);
+}
+
+/* Sidebar active link highlighting */
+.sidebar a[aria-current="page"],
+.sidebar a[aria-current="page"]:hover,
+.sidebar a[aria-current="page"]:focus {
+  font-weight: 600;
+  color: rgb(var(--sl-color-white));
+  background-color: rgba(var(--sl-color-accent), 0.2);
+}
+
+/* Code blocks */
+.expressive-code {
+  margin: 1.5rem 0;
+}
+
+pre {
+  background-color: rgba(var(--sl-color-gray-2), 0.3) !important;
+  border: 1px solid rgba(var(--sl-color-gray-3), 0.2);
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+
+code {
+  background-color: rgba(var(--sl-color-gray-2), 0.5);
+  padding: 0.2em 0.4em;
+  border-radius: 0.25rem;
+  font-size: 0.9em;
+}
+
+pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+/* Inline code */
+:not(pre) > code {
+  color: rgb(var(--sl-color-accent));
+  font-weight: 500;
+}
+
+/* Copy button in code blocks */
+.expressive-code .copy button,
+pre button[title*="Copy"],
+.expressive-code button[data-code*="copy"],
+div[data-rehype-pretty-code-fragment] button {
+  background-color: rgba(var(--sl-color-gray-3), 0.4) !important;
+  border: 1px solid rgba(var(--sl-color-gray-4), 0.3) !important;
+  color: rgb(var(--sl-color-white)) !important;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  opacity: 0.9;
+  transition: all 0.2s ease;
+  font-size: 0.875rem;
+  font-weight: 500;
+  position: relative;
+}
+
+/* Add "Copy" text to empty buttons */
+.expressive-code .copy button:empty::before,
+pre button[title*="Copy"]:empty::before,
+div[data-rehype-pretty-code-fragment] button:empty::before {
+  content: "Copy";
+  color: rgb(var(--sl-color-white));
+  font-size: 0.875rem;
+}
+
+/* Change to "Copied!" after click */
+.expressive-code .copy button.copied::before,
+pre button[title*="Copy"].copied::before {
+  content: "Copied!";
+}
+
+.expressive-code .copy button:hover,
+pre button[title*="Copy"]:hover,
+.expressive-code button[data-code*="copy"]:hover,
+div[data-rehype-pretty-code-fragment] button:hover {
+  background-color: rgba(var(--sl-color-accent), 0.4) !important;
+  border-color: rgba(var(--sl-color-accent), 0.6) !important;
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+/* Copy button icon and text - multiple selectors to ensure visibility */
+.expressive-code .copy svg,
+.expressive-code .copy span,
+pre button svg,
+pre button span,
+pre button::before,
+pre button::after,
+div[data-rehype-pretty-code-fragment] button svg,
+div[data-rehype-pretty-code-fragment] button span {
+  color: rgb(var(--sl-color-white)) !important;
+  fill: rgb(var(--sl-color-white)) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Ensure button content is visible */
+.expressive-code button *,
+pre button * {
+  color: inherit !important;
+  fill: currentColor !important;
+}
+
+/* Show copy button on hover */
+pre:hover button[title*="Copy"],
+.expressive-code:hover .copy button {
+  opacity: 1;
+}
+
+/* Starlight's built-in copy button */
+.sl-markdown-content pre button {
+  background-color: rgba(var(--sl-color-gray-3), 0.4) !important;
+  border: 1px solid rgba(var(--sl-color-gray-4), 0.3) !important;
+  color: rgb(var(--sl-color-white)) !important;
+}
+
+.sl-markdown-content pre button:hover {
+  background-color: rgba(var(--sl-color-accent), 0.4) !important;
+}
+
+/* Search modal/dialog - More specific targeting */
+starlight-search dialog,
+dialog[data-open-modal] {
+  background: rgb(var(--sl-color-gray-1)) !important;
+  border: 1px solid rgba(var(--sl-color-gray-3), 0.3);
+  border-radius: 0.75rem;
+}
+
+starlight-search dialog::backdrop,
+dialog[data-open-modal]::backdrop {
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+/* Search container */
+starlight-search .search-container,
+.pagefind-ui {
+  background-color: rgb(var(--sl-color-gray-1)) !important;
+}
+
+/* Search input */
+starlight-search input,
+.pagefind-ui__search-input {
+  background-color: rgba(var(--sl-color-gray-2), 0.5) !important;
+  border: 1px solid rgba(var(--sl-color-gray-3), 0.3) !important;
+  color: rgb(var(--sl-color-white));
+}
+
+starlight-search input:focus,
+.pagefind-ui__search-input:focus {
+  border-color: rgba(var(--sl-color-accent), 0.5) !important;
+  outline: none;
+}
+
+/* Search results container */
+.pagefind-ui__results,
+starlight-search .search-results {
+  background-color: rgb(var(--sl-color-gray-1)) !important;
+}
+
+/* Highlighted search terms */
+starlight-search mark,
+.pagefind-ui__result-title mark,
+.pagefind-ui__result-excerpt mark {
+  background-color: rgba(var(--sl-color-accent), 0.3);
+  color: rgb(var(--sl-color-white));
+  padding: 0.1em 0.2em;
+  border-radius: 0.2em;
+}
+
+/* Individual search results */
+starlight-search .search-result,
+.pagefind-ui__result {
+  background-color: rgba(var(--sl-color-gray-2), 0.3) !important;
+  border: 1px solid rgba(var(--sl-color-gray-3), 0.2);
+  border-radius: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding: 0.75rem;
+}
+
+starlight-search .search-result:hover,
+starlight-search .search-result:focus-within,
+.pagefind-ui__result:hover,
+.pagefind-ui__result:focus-within {
+  background-color: rgba(var(--sl-color-accent), 0.15) !important;
+  border-color: rgba(var(--sl-color-accent), 0.4);
+}
+
+/* Search button in header */
+.site-title + button[data-open-modal],
+button[aria-label*="Search"] {
+  background-color: rgba(var(--sl-color-gray-2), 0.3);
+  border: 1px solid rgba(var(--sl-color-gray-3), 0.2);
+}
+
+button[data-open-modal]:hover,
+button[aria-label*="Search"]:hover {
+  background-color: rgba(var(--sl-color-gray-2), 0.5);
+  border-color: rgba(var(--sl-color-accent), 0.3);
+}

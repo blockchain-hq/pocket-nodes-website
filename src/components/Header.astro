@@ -1,0 +1,67 @@
+---
+import {appData} from "../lib/data"
+---
+
+<header class="fixed w-full top-0 z-50 bg-transparent backdrop-blur-sm border-b border-gray-800/10">
+  <nav class="container mx-auto px-6 py-4">
+    <div class="flex items-center justify-between">
+      <!-- Logo -->
+      <a href="/" class="flex items-center space-x-2">
+        <img src="/logo.png" alt="x402test Logo" class="w-8 h-8" />
+        <span class="text-xl font-bold text-white">x402test</span>
+      </a>
+
+      <!-- Desktop Navigation -->
+      <div class="hidden md:flex items-center space-x-8">
+        <a href="#features" class="text-gray-300 hover:text-brand transition">Features</a>
+        <a href="#quickstart" class="text-gray-300 hover:text-brand transition">Quick Start</a>
+        <a href="/getting-started/introduction/" class="text-gray-300 hover:text-brand transition">Docs</a>
+        <a href={appData.githubUrl} target="_blank" class="text-gray-300 hover:text-brand transition">GitHub</a>
+      </div>
+
+      <!-- CTA Buttons -->
+      <div class="hidden md:flex items-center space-x-4">
+        <a 
+          href="/getting-started/introduction/" 
+          class="px-6 py-2 text-white rounded-lg hover:opacity-90 transition font-medium bg-brand"
+        >
+          Get Started
+        </a>
+      </div>
+
+      <!-- Mobile Menu Button -->
+      <button 
+        id="mobile-menu-button" 
+        class="md:hidden text-gray-300 hover:text-white"
+        aria-label="Toggle menu"
+      >
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Mobile Menu -->
+    <div id="mobile-menu" class="hidden md:hidden pt-4 pb-2">
+      <div class="flex flex-col space-y-4">
+        <a href="#features" class="text-gray-300 hover:text-brand transition">Features</a>
+        <a href="#quickstart" class="text-gray-300 hover:text-brand transition">Quick Start</a>
+        <a href="/getting-started/introduction/" class="text-gray-300 hover:text-brand transition">Docs</a>
+        <a href={appData.githubUrl} target="_blank" class="text-gray-300 hover:text-brand transition">GitHub</a>
+        <a href="/getting-started/introduction/" class="px-6 py-2 text-white rounded-lg hover:opacity-90 transition font-medium text-center bg-brand">Get Started</a>
+      </div>
+    </div>
+  </nav>
+</header>
+
+<script>
+  const mobileMenuButton = document.getElementById('mobile-menu-button');
+  const mobileMenu = document.getElementById('mobile-menu');
+
+  if (mobileMenuButton && mobileMenu) {
+    mobileMenuButton.addEventListener('click', () => {
+      mobileMenu.classList.toggle('hidden');
+    });
+  }
+</script>
+

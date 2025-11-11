@@ -1,0 +1,128 @@
+---
+import {appData} from "../lib/data"
+---
+
+<section id="quickstart" class="py-20 bg-gradient-to-b from-black to-gray-900">
+  <div class="container mx-auto px-6">
+    <div class="max-w-4xl mx-auto">
+      <!-- Section Header -->
+      <div class="text-center mb-12">
+        <h2 class="text-4xl md:text-5xl font-bold text-white mb-4">
+          Get Started in <span class="text-brand">Minutes</span>
+        </h2>
+        <p class="text-xl text-gray-300">
+          Install, configure, and start testing x402 payment flows on Solana.
+        </p>
+      </div>
+
+      <!-- Command Box -->
+      <div class="bg-gray-950 rounded-2xl p-8 shadow-2xl shadow-green-500/10 mb-8 border border-gray-800">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center space-x-2">
+            <div class="w-3 h-3 rounded-full bg-red-500"></div>
+            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+            <div class="w-3 h-3 rounded-full bg-green-500"></div>
+          </div>
+          <button 
+            id="copy-button"
+            class="px-4 py-2 bg-brand text-white rounded-lg text-sm font-medium transition flex items-center gap-2 hover:opacity-90"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            Copy
+          </button>
+        </div>
+        <div class="font-mono text-lg">
+          <span class="text-gray-400">$ </span>
+          <span id="command-text" class="text-brand">pnpm add -D x402test</span>
+        </div>
+      </div>
+
+      <!-- Steps -->
+      <div class="grid md:grid-cols-3 gap-8 mb-12">
+        <div class="text-center">
+          <div class="w-16 h-16 bg-green-900/30 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4 text-brand">
+            1
+          </div>
+          <h3 class="text-xl font-semibold text-white mb-2">Install Package</h3>
+          <p class="text-gray-400">Add x402test to your project as a dev dependency</p>
+        </div>
+        <div class="text-center">
+          <div class="w-16 h-16 bg-green-900/30 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4 text-brand">
+            2
+          </div>
+          <h3 class="text-xl font-semibold text-white mb-2">Initialize</h3>
+          <p class="text-gray-400">Run <code class="text-brand">x402test init</code> to create config and test wallet</p>
+        </div>
+        <div class="text-center">
+          <div class="w-16 h-16 bg-green-900/30 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4 text-brand">
+            3
+          </div>
+          <h3 class="text-xl font-semibold text-white mb-2">Start Testing</h3>
+          <p class="text-gray-400">Run <code class="text-brand">x402test start</code> and begin testing payments!</p>
+        </div>
+      </div>
+
+      <!-- Additional Resources -->
+      <div class="bg-gray-800 rounded-xl border-2 border-gray-700 p-8">
+        <h3 class="text-2xl font-bold text-white mb-4">Additional Resources</h3>
+        <div class="grid md:grid-cols-2 gap-4">
+          <a 
+            href={appData.npmPackageUrl} 
+            target="_blank"
+            class="flex items-center gap-3 p-4 rounded-lg hover:bg-gray-700 transition group"
+          >
+            <svg class="w-8 h-8 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M0 7.334v8h6.666v1.332H12v-1.332h12v-8H0zm6.666 6.664H5.334v-4H3.999v4H1.335V8.667h5.331v5.331zm4 0v1.336H8.001V8.667h5.334v5.332h-2.669v-.001zm12.001 0h-1.33v-4h-1.336v4h-1.335v-4h-1.33v4h-2.671V8.667h8.002v5.331zM10.665 10H12v2.667h-1.335V10z"/>
+            </svg>
+            <div>
+              <div class="font-semibold text-white group-hover:text-brand">NPM Package</div>
+              <div class="text-sm text-gray-400">View on npm registry</div>
+            </div>
+          </a>
+          <a 
+            href={appData.githubUrl} 
+            target="_blank"
+            class="flex items-center gap-3 p-4 rounded-lg hover:bg-gray-700 transition group"
+          >
+            <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" />
+            </svg>
+            <div>
+              <div class="font-semibold text-white group-hover:text-brand">GitHub Repository</div>
+              <div class="text-sm text-gray-400">Star us on GitHub</div>
+            </div>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  const copyButton = document.getElementById('copy-button');
+  const commandText = document.getElementById('command-text');
+
+  if (copyButton && commandText) {
+    copyButton.addEventListener('click', async () => {
+      const text = commandText.textContent || '';
+      try {
+        await navigator.clipboard.writeText(text);
+        const originalHTML = copyButton.innerHTML;
+        copyButton.innerHTML = `
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+          </svg>
+          Copied!
+        `;
+        setTimeout(() => {
+          copyButton.innerHTML = originalHTML;
+        }, 2000);
+      } catch (err) {
+        console.error('Failed to copy:', err);
+      }
+    });
+  }
+</script>
+
