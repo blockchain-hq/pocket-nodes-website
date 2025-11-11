@@ -1,16 +1,15 @@
 import React from "react";
 import { Button } from "./ui/moving-border";
 import {
-  MonitorPlay,
-  Key,
-  Sparkles,
-  Share2,
-  Zap,
-  FileDown,
-  type LucideIcon,
+  CreditCard,
+  Wallet,
+  Coins,
   Server,
-  Package,
+  ShieldCheck,
+  Workflow,
+  type LucideIcon,
 } from "lucide-react";
+import { appData } from "../lib/data";
 
 interface Feature {
   icon: LucideIcon;
@@ -19,50 +18,22 @@ interface Feature {
   status: "available" | "coming-soon";
 }
 
-const features: Feature[] = [
-  {
-    icon: Zap,
-    title: "Simple Testing API",
-    description:
-      "Fluent interface for making payment-protected HTTP requests with automatic payment handling.",
-    status: "available",
-  },
-  {
-    icon: Server,
-    title: "Mock Server",
-    description:
-      "Built-in server for simulating payment-protected endpoints during development.",
-    status: "available",
-  },
-  {
-    icon: Package,
-    title: "Solana USDC Payments",
-    description:
-      "Native integration with Solana blockchain for USDC micropayments on devnet and localnet.",
-    status: "available",
-  },
-  {
-    icon: Sparkles,
-    title: "AI Agent Ready",
-    description:
-      "Perfect for testing autonomous agents with budget management and payment verification.",
-    status: "available",
-  },
-  {
-    icon: Key,
-    title: "Replay Protection",
-    description:
-      "Built-in security against replay attacks with transaction signature tracking.",
-    status: "available",
-  },
-  {
-    icon: FileDown,
-    title: "Developer Friendly",
-    description:
-      "Auto-funded test wallets, comprehensive examples, and intuitive CLI.",
-    status: "available",
-  },
-];
+// Map icon names to Lucide components
+const iconMap: Record<string, LucideIcon> = {
+  "credit-card": CreditCard,
+  wallet: Wallet,
+  coins: Coins,
+  server: Server,
+  "shield-check": ShieldCheck,
+  workflow: Workflow,
+};
+
+const features: Feature[] = appData.features.map((feature) => ({
+  icon: iconMap[feature.icon] || CreditCard,
+  title: feature.title,
+  description: feature.description,
+  status: "available" as const,
+}));
 
 export default function Features() {
   return (
@@ -71,12 +42,13 @@ export default function Features() {
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            Everything You Need for{" "}
-            <span className="text-brand">Payment Testing</span>
+            Powerful Features for{" "}
+            <span className="text-brand">n8n Automation</span>
           </h2>
           <p className="text-xl text-gray-300">
-            x402test provides a complete toolkit for developing and testing HTTP
-            402 Payment Required flows with Solana blockchain payments.
+            x402 Pocket Nodes provides everything you need to integrate
+            micropayments into your n8n workflows with automatic payment
+            handling and wallet management.
           </p>
         </div>
 
@@ -91,7 +63,7 @@ export default function Features() {
                 duration={3000 + index * 500}
                 borderRadius="1rem"
                 containerClassName="h-auto w-full"
-                borderClassName="bg-[radial-gradient(#5e17eb_40%,transparent_60%)]"
+                borderClassName="bg-[radial-gradient(#ff751f_40%,transparent_60%)]"
                 className="bg-gray-900/90 border-gray-800 text-white p-6 h-full"
               >
                 <div className="flex items-start space-x-4 h-full">
@@ -107,7 +79,7 @@ export default function Features() {
                         {feature.title}
                       </h3>
                       {feature.status === "coming-soon" && (
-                        <span className="px-2 py-1 bg-green-900/30 text-xs rounded-full font-medium text-brand">
+                        <span className="px-2 py-1 bg-orange-900/30 text-xs rounded-full font-medium text-brand">
                           Soon
                         </span>
                       )}
@@ -125,14 +97,15 @@ export default function Features() {
         {/* Value Proposition Banner */}
         <div
           className="mt-20 rounded-2xl p-8 md:p-12 text-white text-center"
-          style={{ background: "linear-gradient(to right, #5e17eb, #009950)" }}
+          style={{ background: "linear-gradient(to right, #ff751f, #ff9f50)" }}
         >
           <h3 className="text-3xl md:text-4xl font-bold mb-4">
-            Test Micropayment APIs Locally
+            Seamless n8n Integration
           </h3>
-          <p className="text-xl text-green-100 max-w-3xl mx-auto">
-            Run your tests on a local Solana validator with auto-funded test
-            wallets. No real funds needed. No complicated setup.
+          <p className="text-xl text-orange-100 max-w-3xl mx-auto">
+            Works with any trigger, connects with standard HTTP Request nodes,
+            and automatically handles all payment flows. Start on devnet with
+            test funds, deploy to mainnet when ready.
           </p>
         </div>
       </div>

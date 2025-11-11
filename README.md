@@ -1,43 +1,56 @@
-# x402test Landing Page
+# x402 Pocket Nodes Website
 
-This is the official landing page for [x402test](https://x402test.xyz/) - a free, open-source, and fast interactive UI based testing tool for Solana Anchor programs.
+Official website and documentation for [x402 Pocket Nodes](https://pocket-nodes.testship.xyz/) - n8n community nodes for seamless x402 payment protocol integration.
 
-## 🚀 About x402test
+## About x402 Pocket Nodes
 
-x402test brings testing directly to your Solana Anchor programs, wherever they are. Unlike other testing platforms that require you to move your code to their IDE or playground, x402test works seamlessly with your existing development environment.
+x402 Pocket Nodes enables n8n users to integrate micropayments into their workflows. Make HTTP requests to x402-enabled APIs with automatic Solana/USDC payment handling.
 
-**Value Proposition:** _Bring testing to your program rather than moving your program to the test suite._
+**Value Proposition:** _Bring micropayments to your n8n workflows with automatic payment handling and persistent wallet management._
 
-## 🛠️ Tech Stack
+## Tech Stack
 
-- **Astro** - Fast static site generator
+- **Astro** - Fast static site generator with Starlight docs
 - **TailwindCSS v4** - Utility-first CSS framework
+- **React** - Interactive components
 - **TypeScript** - Type safety and better DX
+- **Starlight** - Beautiful documentation framework
 
-## 📦 Project Structure
+## Project Structure
 
 ```
 /
 ├── public/
-│   └── favicon.svg          # Custom x402test logo
+│   ├── logo.png                    # x402 logo
+│   └── *.png                       # n8n node screenshots
 ├── src/
 │   ├── components/
-│   │   ├── Header.astro     # Navigation bar
-│   │   ├── Hero.astro       # Hero section with CTA
-│   │   ├── Features.astro   # Features grid
-│   │   ├── Timeline.astro   # Release timeline/roadmap
-│   │   ├── QuickStart.astro # Quick start guide
-│   │   └── Footer.astro     # Footer with links
+│   │   ├── Header.astro           # Navigation bar
+│   │   ├── Hero.tsx               # Hero section with CTA
+│   │   ├── Features.tsx           # Features grid
+│   │   ├── QuickStart.astro       # Quick start guide
+│   │   └── Footer.astro           # Footer with links
+│   ├── content/
+│   │   └── docs/                  # Documentation content
+│   │       ├── getting-started/   # Installation, quick start
+│   │       ├── concepts/          # Core concepts
+│   │       ├── api/               # Node reference
+│   │       ├── examples/          # Workflow examples
+│   │       ├── advanced/          # Advanced topics
+│   │       └── cli/               # Showcase server
 │   ├── layouts/
-│   │   └── main.astro       # Base layout
+│   │   └── main.astro             # Base layout
+│   ├── lib/
+│   │   └── data.ts                # Site data and configuration
 │   ├── pages/
-│   │   └── index.astro      # Landing page
+│   │   └── index.astro            # Landing page
 │   └── styles/
-│       └── global.css       # Global styles and custom CSS
+│       ├── global.css             # Global styles
+│       └── starlight.css          # Documentation styles
 └── package.json
 ```
 
-## 🏃‍♂️ Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -48,8 +61,8 @@ x402test brings testing directly to your Solana Anchor programs, wherever they a
 
 ```bash
 # Clone the repository
-git clone <repo-url>
-cd x402test-landing
+git clone https://github.com/blockchain-hq/x402-pocket-nodes.git
+cd pocket-nodes-website
 
 # Install dependencies
 pnpm install
@@ -70,40 +83,86 @@ pnpm build
 pnpm preview
 ```
 
-## 🎨 Design Principles
+## Design Principles
 
-This landing page is inspired by the [Astroship template](https://github.com/surjithctly/astroship) and follows modern web design principles:
-
-- **Clean and Modern**: Minimalist design with focus on content
-- **Fast Loading**: Optimized for performance
+- **Clean and Modern**: Orange/black theme matching the x402 logo
+- **Fast Loading**: Optimized for performance with Astro
 - **Mobile First**: Fully responsive design
 - **Accessible**: WCAG compliant components
 - **SEO Optimized**: Proper meta tags and semantic HTML
+- **Developer Focused**: Clear examples and code snippets
 
-## 📝 Content Updates
+## Content Updates
+
+### Landing Page
 
 To update content on the landing page:
 
-1. **Hero Section**: Edit `/src/components/Hero.astro`
-2. **Features**: Update the `features` array in `/src/components/Features.astro`
-3. **Timeline**: Modify the `timeline` array in `/src/components/Timeline.astro`
+1. **Site Data**: Edit `/src/lib/data.ts` for titles, URLs, features
+2. **Hero Section**: Modify `/src/components/Hero.tsx`
+3. **Features**: Update in `/src/lib/data.ts`, rendered by Features.tsx
 4. **Quick Start**: Edit `/src/components/QuickStart.astro`
 
-## 🔗 Links
+### Documentation
 
-- [x402test Website](https://x402test.xyz/)
-- [NPM Package](https://www.npmjs.com/package/@blockchain-hq/x402test)
-- [GitHub Repository](https://github.com/blockchain-hq/x402test)
+Documentation is in `/src/content/docs/`:
+
+1. **Getting Started**: Installation and quick start guides
+2. **Concepts**: Core concepts and how things work
+3. **Node Reference**: Complete configuration references
+4. **Examples**: Real-world workflow examples
+5. **Advanced**: Production configurations and security
+6. **Showcase Server**: Information about the Express.js showcase server
+
+## Color Scheme
+
+The site uses the orange color (#ff751f) from the x402 logo:
+
+- Primary brand color: `#ff751f`
+- Gradient light: `#ff9f50`
+- CSS variable: `--brand-color`
+- Tailwind class: `text-brand`, `bg-brand`, etc.
+
+## Links
+
+- [Live Website](https://pocket-nodes.testship.xyz/)
+- [NPM Package](https://www.npmjs.com/package/@blockchain-hq/n8n-nodes-x402-pocket)
+- [GitHub Repository](https://github.com/blockchain-hq/x402-pocket-nodes)
+- [n8n Community](https://community.n8n.io/)
 - [Astro Documentation](https://docs.astro.build)
+- [Starlight Documentation](https://starlight.astro.build)
 
-## 📄 License
+## Contributing
 
-This landing page is open source. The x402test tool itself is licensed under GPL-3.0.
+Contributions are welcome! To contribute:
 
-## 🤝 Contributing
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test locally with `pnpm dev`
+5. Submit a pull request
 
-Contributions are welcome! Feel free to open issues or submit pull requests.
+### Documentation Guidelines
+
+- Use clear, concise language
+- Include code examples
+- Add screenshots for visual steps
+- Test all code snippets
+- Follow existing formatting
+
+## Deployment
+
+The site is configured for deployment to any static hosting:
+
+- **Vercel**: Connect GitHub repository
+- **Netlify**: Connect GitHub repository
+- **GitHub Pages**: Use GitHub Actions
+- **Custom**: Deploy `/dist` folder after `pnpm build`
+
+## License
+
+This website is open source. The x402 Pocket Nodes package itself is licensed under MIT.
 
 ---
 
-Built with ❤️ using [Astro](https://astro.build) and [TailwindCSS](https://tailwindcss.com)
+Built with Astro, Starlight, and TailwindCSS for the n8n and Solana communities.

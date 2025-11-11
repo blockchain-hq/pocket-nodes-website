@@ -1,391 +1,476 @@
 ---
 title: Mock Server
-description: Configure and run the x402test mock server
+description: Test x402 integration without real blockchain transactions
 ---
 
+The x402 Mock Server node lets you test the complete x402 payment flow in n8n without making real blockchain transactions or spending actual money.
 
-The x402test mock server simulates payment-protected endpoints for testing your client applications and AI agents.
+## What is the Mock Server?
 
-## Quick Start
+The Mock Server is a webhook-based n8n node that simulates an x402-enabled API endpoint. It:
 
-```bash
-npx x402test init
+- Returns **402 Payment Required** responses
+- Accepts payment proofs in `X-Payment` headers
+- Verifies payment format and signatures
+- Returns mock data after successful payment
+- Tracks used signatures (replay protection)
 
-npx x402test start
-```
+Perfect for development, testing, and learning x402!
 
-## Configuration File
+## Setting Up Mock Server
 
-The configuration file (`x402test.config.js`) defines your server settings and routes:
+###Step 1: Create Mock Server Workflow
 
-```javascript
-export default {
-  port: 4402,
-  network: "solana-devnet",
-  rpcUrl: "http://localhost:8899",
-  recipient: "YOUR_WALLET_ADDRESS",
+1. Create a new workflow named "x402 Mock API"
+2. Add **x402 Mock Server** node
+3. The node is a webhook, so it will generate a URL
 
-  routes: {
-    "/api/data": {
-      price: "0.01",
-      description: "Data API access",
-      response: { message: "Your data here" },
-    },
-  },
-};
-```
+### Step 2: Configure the Node
 
-## Server Options
+Click on the Mock Server node to configure:
 
-### Port
+**HTTP Method**: Choose request method
 
-```javascript
-{
-  port: 4402; // Server port (default: 4402)
-}
-```
+- GET, POST, PUT, DELETE
 
-### Network
+**Path**: Webhook path segment
 
-```javascript
-{
-  network: "solana-devnet"; // or 'solana-localnet', 'solana-mainnet'
-}
-```
+- Example: `test-api`
+- Full URL will be: `https://your-n8n.com/webhook/test-api`
 
-### RPC URL
+**Network**: Blockchain network
 
-```javascript
-{
-  rpcUrl: "http://localhost:8899"; // Solana RPC endpoint
-}
-```
+- Devnet (for testing)
+- Mainnet (for production)
 
-### Recipient
+**Payment Amount**: Required payment in smallest units
 
-```javascript
-{
-  recipient: "FcxKSp7YxqYXdq..."; // Wallet to receive payments
-}
-```
+- Example: `10000` = 0.01 USDC (6 decimals)
+- Example: `100000` = 0.10 USDC
 
-## Route Configuration
+**Description**: What the API does
 
-### Static Response
+- Shown in 402 response
+- Helps clients understand the charge
 
-```javascript
-routes: {
-  '/api/static': {
-    price: '0.01',
-    description: 'Static content',
-    response: {
-      data: 'Hello World',
-      timestamp: Date.now()
-    }
-  }
-}
-```
+**Mock Response**: Data to return after payment
 
-### Dynamic Response
+- JSON object
+- Can be static or dynamic (using expressions)
 
-```javascript
-routes: {
-  '/api/dynamic': {
-    price: '0.01',
-    description: 'Dynamic content',
-    response: (req) => ({
-      method: req.method,
-      path: req.path,
-      query: req.query,
-      timestamp: Date.now()
-    })
-  }
-}
-```
+**Verify On-Chain**: Settlement mode
 
-### Custom Status Code
+- `false` = Signature verification only (fast, no blockchain)
+- `true` = Actual on-chain settlement (requires funded wallet)
 
-```javascript
-routes: {
-  '/api/created': {
-    price: '0.01',
-    description: 'Returns 201',
-    status: 201,
-    response: { created: true }
-  }
-}
-```
+### Step 3: Activate the Workflow
 
-### Different Price Tiers
+1. Click **"Active"** toggle at the top right
+2. Copy the webhook URL from the node
+3. Use this URL in your x402 Client nodes
 
-```javascript
-routes: {
-  '/api/basic': {
-    price: '0.01',    // 1 cent
-    description: 'Basic tier',
-    response: { tier: 'basic' }
-  },
-  '/api/premium': {
-    price: '0.10',    // 10 cents
-    description: 'Premium tier',
-    response: { tier: 'premium' }
-  },
-  '/api/enterprise': {
-    price: '1.00',    // 1 dollar
-    description: 'Enterprise tier',
-    response: { tier: 'enterprise' }
-  }
-}
-```
+## Example Configurations
 
-## HTTP Methods
-
-The mock server supports all HTTP methods:
-
-```javascript
-// Configuration
-routes: {
-  '/api/resource': {
-    price: '0.01',
-    description: 'CRUD endpoint',
-    response: (req) => {
-      switch (req.method) {
-        case 'GET':
-          return { action: 'read', data: [] };
-        case 'POST':
-          return { action: 'create', body: req.body };
-        case 'PUT':
-          return { action: 'update', body: req.body };
-        case 'DELETE':
-          return { action: 'delete' };
-        default:
-          return { action: 'unknown' };
-      }
-    }
-  }
-}
-```
-
-```typescript
-// Client usage
-await x402(url).get().withPayment("0.01").execute();
-await x402(url).post({...}).withPayment("0.01").execute();
-await x402(url).put({...}).withPayment("0.01").execute();
-await x402(url).delete().withPayment("0.01").execute();
-```
-
-## CLI Commands
-
-### Start Server
-
-```bash
-npx x402test start
-
-npx x402test start --config ./my-config.js
-
-npx x402test start --port 8080
-```
-
-### List Routes
-
-```bash
-npx x402test routes
-
-npx x402test routes --config ./my-config.js
-```
-
-Output:
+### Simple Data API (0.01 USDC)
 
 ```
-Configured Routes:
-
-/api/data: Data API access
-  Price: 0.01 USDC
-  Response: { "message": "Your data here" }
-  Status: 200
-
-/api/premium: Premium content access
-  Price: 0.10 USDC
-  Response: { "data": "Premium content" }
-  Status: 200
+HTTP Method: POST
+Path: data-api
+Network: Devnet
+Payment Amount: 10000
+Description: Simple data access
+Mock Response: {"status": "success", "data": [1, 2, 3]}
+Verify On-Chain: false
 ```
 
-## Server Logs
-
-The server logs all requests and payment verifications:
+### Premium Content (0.10 USDC)
 
 ```
- GET /api/data
-   X-PAYMENT header present
-   Found token transfer (type 12)
-   Account indices: [0, 1, 2, 3, 4]
-   Source token account: FcxKSp...
-   Dest token account: EPjFWdd...
-   Mint: EPjFWdd5AufqSSqeM2qN...
-   Source owner: FcxKSp7YxqYXdq...
-   Destination owner: EPjFWdd5Aufq...
-✓ Payment verified
-✓ Response sent: 200
+HTTP Method: GET
+Path: premium-content
+Network: Devnet
+Payment Amount: 100000
+Description: Premium content access
+Mock Response: {"content": "Premium data here", "timestamp": "{{new Date().toISOString()}}"}
+Verify On-Chain: false
 ```
 
-## Payment Verification
+### AI API Simulation (0.25 USDC)
 
-The server automatically:
+```
+HTTP Method: POST
+Path: ai-inference
+Network: Devnet
+Payment Amount: 250000
+Description: AI model inference
+Mock Response: {"model": "gpt-4", "result": "AI generated response", "tokens": 150}
+Verify On-Chain: false
+```
 
-1. **Parses X-PAYMENT Header**: Extracts payment information
-2. **Fetches Transaction**: Retrieves transaction from Solana
-3. **Verifies Amount**: Checks payment meets requirement
-4. **Verifies Recipient**: Ensures correct recipient
-5. **Verifies Token**: Confirms USDC was used
-6. **Checks Replay**: Prevents signature reuse
-7. **Marks Used**: Stores signature in `.x402test-signatures.json`
+## Using the Mock Server
 
-## Error Responses
+### Test Workflow Setup
 
-### No Payment
+```
+[Manual Trigger]
+    ↓
+[x402 Wallet Manager]
+  - Network: Devnet
+  - Action: Get Wallet Info
+    ↓
+[x402 Client]
+  - Resource URL: [Your webhook URL]
+  - Method: POST
+  - Auto-Pay: true
+  - Max Payment: 1.00
+    ↓
+[Process Response]
+```
 
-```typescript
-// Request without X-PAYMENT header
-// Response: 402
+### First Request (No Payment)
+
+When the Client first calls your mock server:
+
+```json
+// Client sends
+GET /webhook/test-api
+
+// Mock Server responds
+HTTP 402 Payment Required
 {
   "x402Version": 1,
   "accepts": [{
-    "scheme": "solanaTransferChecked",
+    "scheme": "exact",
+    "network": "solana-devnet",
     "maxAmountRequired": "10000",
-    // ... other fields
-  }],
-  "error": null
+    "resource": "/webhook/test-api",
+    "description": "Simple data access",
+    "payTo": "[Mock server's wallet address]",
+    "asset": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
+  }]
 }
 ```
 
-### Insufficient Payment
+### Second Request (With Payment)
 
-```typescript
-// Paid 0.005, required 0.01
-// Response: 402
+Client automatically retries with payment:
+
+```json
+// Client sends
+GET /webhook/test-api
+X-Payment: eyJ4NDAyVmVyc2lvbiI6MSw...
+
+// Mock Server responds
+HTTP 200 OK
 {
-  "x402Version": 1,
-  "accepts": [...],
-  "error": "Insufficient amount: expected 10000, got 5000"
+  "status": "success",
+  "data": [1, 2, 3],
+  "_payment": {
+    "amount": "0.01",
+    "from": "9rKnvE...",
+    "verified": true
+  }
 }
 ```
 
-### Invalid Payment
+## Mock Server Output
 
-```typescript
-// Invalid or expired transaction
-// Response: 402
+The Mock Server node provides execution output for monitoring:
+
+### Payment Required Event
+
+```json
 {
-  "x402Version": 1,
-  "accepts": [...],
-  "error": "Transaction not found or not confirmed"
-}
-```
-
-### Replay Attack
-
-```typescript
-// Signature already used
-// Response: 402
-{
-  "x402Version": 1,
-  "accepts": [...],
-  "error": "Payment already processed"
-}
-```
-
-## Advanced Configuration
-
-### Multiple Recipients
-
-```javascript
-// You can configure different routes with different recipients
-routes: {
-  '/api/service-a': {
-    price: '0.01',
-    response: { service: 'A' }
-    // Uses default recipient
+  "event": "payment_required",
+  "mockServerWallet": {
+    "address": "HgWtto74ZqPAF1G1pvTM61GHGxsH4rBPtx6nBFjqM52d",
+    "network": "solana-devnet",
+    "createdAt": "2025-11-10T12:00:00.000Z",
+    "solBalance": 0.5,
+    "explorerUrl": "https://explorer.solana.com/address/...",
+    "fundingInstructions": "Get devnet SOL: https://faucet.solana.com/"
   },
-  '/api/service-b': {
-    price: '0.02',
-    response: (req) => {
-      // Could manually verify with different recipient
-      return { service: 'B' };
-    }
+  "paymentRequested": {
+    "amount": "10000",
+    "amountDisplay": "0.010000 USDC",
+    "description": "Simple data access"
   }
 }
 ```
 
-### Request Validation
+### Payment Verified Event
 
-```javascript
-routes: {
-  '/api/validated': {
-    price: '0.01',
-    description: 'Validated endpoint',
-    response: (req) => {
-      // Access request details
-      if (!req.query.userId) {
-        return { error: 'userId required' };
-      }
-
-      return {
-        userId: req.query.userId,
-        data: 'Your content'
-      };
-    }
-  }
-}
-```
-
-### Complex Responses
-
-```javascript
-routes: {
-  '/api/complex': {
-    price: '0.05',
-    description: 'Complex response',
-    response: (req) => {
-      const now = Date.now();
-      return {
-        data: {
-          id: Math.random().toString(36),
-          timestamp: now,
-          expires: now + 3600000,
-          content: 'Your premium content',
-          metadata: {
-            version: '1.0',
-            format: 'json'
-          }
-        },
-        _links: {
-          self: `${req.protocol}://${req.get('host')}${req.path}`,
-          related: '/api/related'
-        }
-      };
-    }
-  }
-}
-```
-
-## Environment Variables
-
-You can use environment variables in your configuration:
-
-```javascript
-export default {
-  port: parseInt(process.env.PORT || "4402"),
-  rpcUrl: process.env.RPC_URL || "http://localhost:8899",
-  recipient: process.env.RECIPIENT_WALLET || "default-wallet",
-
-  routes: {
-    // ... routes
+```json
+{
+  "event": "payment_verified_offchain",
+  "mockServerWallet": {
+    "address": "HgWtto74ZqPAF1G1pvTM61GHGxsH4rBPtx6nBFjqM52d",
+    "network": "solana-devnet"
   },
-};
+  "verification": {
+    "method": "off-chain",
+    "status": "verified"
+  },
+  "mockResponse": {
+    "status": "success",
+    "data": [1, 2, 3]
+  }
+}
 ```
 
-## Next Steps
+## Wallet Management
 
-- [Testing Client](/testing-client) - Use the client to test your server
-- [CLI Reference](/cli/overview) - Learn all CLI commands
-- [Examples](/examples/basic-payment) - See complete examples
+### Auto-Generated Wallet
+
+The Mock Server automatically generates a persistent wallet:
+
+- **Generated once** on first request
+- **Persists** across all requests and workflow runs
+- **Separate wallets** for devnet and mainnet
+- **Visible** in execution output
+
+### Finding Your Wallet Address
+
+1. **Check Output Panel**: After first request, check the node's output
+2. **Look for** `mockServerWallet.address`
+3. **Copy the address** for funding (if using on-chain mode)
+
+### Funding the Wallet (For On-Chain Mode)
+
+Only needed if `Verify On-Chain` is enabled:
+
+**Devnet**:
+
+```bash
+# Get SOL
+solana airdrop 0.5 [YOUR_WALLET_ADDRESS] --url devnet
+
+# Get USDC
+# Visit: https://spl-token-faucet.com/?token-name=USDC-Dev
+# Paste your wallet address
+```
+
+**Mainnet**:
+
+- Send real SOL and USDC to the wallet address
+- Only for production use
+
+## Verification Modes
+
+### Off-Chain (Default)
+
+**What it does**:
+
+- Verifies payment signature format
+- Checks amount, network, timestamp
+- No blockchain interaction
+- Instant verification
+
+**Use for**:
+
+- Development and testing
+- Learning x402
+- Rapid iteration
+- Demo workflows
+
+**Advantages**:
+
+- No funding needed
+- Instant responses
+- No blockchain fees
+- Works offline
+
+### On-Chain
+
+**What it does**:
+
+- Everything from off-chain mode
+- PLUS: Submits transaction to Solana
+- Verifies on blockchain
+- Mock server actually receives USDC
+
+**Use for**:
+
+- Production testing
+- End-to-end validation
+- Regulatory compliance
+- Real money flow testing
+
+**Requirements**:
+
+- Mock server wallet must have SOL (for fees)
+- Client must have USDC and SOL
+- Internet connection
+- ~5-10 seconds per request
+
+## Dynamic Responses
+
+Use n8n expressions in mock responses:
+
+### Timestamp
+
+```json
+{
+  "data": "response",
+  "timestamp": "{{new Date().toISOString()}}"
+}
+```
+
+### Request Data
+
+```json
+{
+  "echo": "{{$json}}",
+  "method": "{{$requestObject.method}}",
+  "path": "{{$requestObject.path}}"
+}
+```
+
+### Random Data
+
+```json
+{
+  "random": "{{Math.random()}}",
+  "id": "{{Math.floor(Math.random() * 1000)}}"
+}
+```
+
+## Testing Scenarios
+
+### Test Basic Payment Flow
+
+```
+Purpose: Verify payment handling works
+Config:
+  - Amount: 10000 (0.01 USDC)
+  - Verify On-Chain: false
+Expected: Client pays, gets data
+```
+
+### Test Payment Limits
+
+```
+Purpose: Ensure client respects limits
+Config:
+  - Amount: 5000000 (5.00 USDC)
+Client:
+  - Max Payment: 1.00 USDC
+Expected: Client rejects (exceeds limit)
+```
+
+### Test Insufficient Balance
+
+```
+Purpose: Handle low balance gracefully
+Setup:
+  - Client wallet: 0.005 USDC
+  - Required: 0.01 USDC
+Expected: Client error "Insufficient balance"
+```
+
+### Test On-Chain Settlement
+
+```
+Purpose: Validate full blockchain flow
+Config:
+  - Amount: 10000
+  - Verify On-Chain: true
+  - Mock server wallet funded with SOL
+Expected: Transaction on blockchain
+```
+
+### Test Replay Protection
+
+```
+Purpose: Prevent payment reuse
+Setup:
+  1. Make successful payment
+  2. Capture X-Payment header
+  3. Try to reuse same header
+Expected: Server rejects duplicate
+```
+
+## Troubleshooting
+
+### "No wallet data found" in Client
+
+**Problem**: Client can't find wallet
+
+**Solutions**:
+
+- Ensure Wallet Manager is connected
+- Check both nodes use same network
+- Re-run Wallet Manager node
+
+### "Transaction not found" with On-Chain
+
+**Problem**: Transaction submitted but verification fails
+
+**Solutions**:
+
+- Wait longer (RPC can be slow on devnet)
+- Retry the workflow
+- Check Solana explorer for transaction
+
+### Mock Server not responding
+
+**Problem**: Webhook returns 404
+
+**Solutions**:
+
+- Ensure workflow is **Active**
+- Check webhook URL is correct
+- Try deactivating and reactivating workflow
+
+### "Insufficient balance" but wallet is funded
+
+**Problem**: Balance check fails despite funding
+
+**Solutions**:
+
+- Wait 30 seconds after funding
+- Re-run Wallet Manager to refresh balance
+- Check correct network (devnet vs mainnet)
+
+## Real-World Test Workflow
+
+Here's a complete test workflow:
+
+```
+┌─────────────────────┐
+│  Manual Trigger     │
+└──────────┬──────────┘
+           │
+           ↓
+┌────────────────────────┐
+│  x402 Wallet Manager   │
+│  - Network: Devnet     │
+│  - Action: Get Info    │
+└──────────┬─────────────┘
+           │
+           ↓
+┌────────────────────────┐
+│  x402 Client           │
+│  - URL: Mock webhook   │
+│  - Auto-Pay: true      │
+│  - Max: 0.10 USDC      │
+└──────────┬─────────────┘
+           │
+           ↓
+┌────────────────────────┐
+│  IF Node               │
+│  {{$json.status}}      │
+│  === "success"         │
+└──────────┬─────────────┘
+      ┌────┴─────┐
+      ↓          ↓
+  Success    Failure
+   Path       Path
+```
+
+## What's Next?
+
+- [Payment Flow](/concepts/payment-flow/) - Understanding the process
+- [Basic Payment](/examples/basic-payment/) - Your first payment
+- [Error Handling](/examples/error-handling/) - Handle failures
+- [Multiple Endpoints](/examples/multiple-endpoints/) - Test variations

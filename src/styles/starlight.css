@@ -1,10 +1,10 @@
-/* Starlight custom styles for x402test */
+/* Starlight custom styles for x402 Pocket Nodes */
 
-/* Brand colors - purple/green gradient theme */
+/* Brand colors - orange theme from logo */
 :root {
-  --sl-color-accent-low: 94, 23, 235;
-  --sl-color-accent: 138, 180, 248;
-  --sl-color-accent-high: 224, 241, 255;
+  --sl-color-accent-low: 255, 117, 31;
+  --sl-color-accent: 255, 159, 80;
+  --sl-color-accent-high: 255, 190, 130;
   --sl-color-white: 255, 255, 255;
   --sl-color-gray-1: 23, 25, 35;
   --sl-color-gray-2: 33, 39, 55;
@@ -17,9 +17,9 @@
 
 /* Dark theme (default) */
 [data-theme="dark"] {
-  --sl-color-accent-low: 94, 23, 235;
-  --sl-color-accent: 138, 180, 248;
-  --sl-color-accent-high: 224, 241, 255;
+  --sl-color-accent-low: 255, 117, 31;
+  --sl-color-accent: 255, 159, 80;
+  --sl-color-accent-high: 255, 190, 130;
   --sl-color-white: 255, 255, 255;
   --sl-color-gray-1: 23, 25, 35;
   --sl-color-gray-2: 33, 39, 55;
@@ -32,9 +32,9 @@
 
 /* Light theme */
 [data-theme="light"] {
-  --sl-color-accent-low: 224, 241, 255;
-  --sl-color-accent: 94, 23, 235;
-  --sl-color-accent-high: 138, 180, 248;
+  --sl-color-accent-low: 255, 190, 130;
+  --sl-color-accent: 255, 117, 31;
+  --sl-color-accent-high: 255, 159, 80;
   --sl-color-black: 17, 24, 39;
   --sl-color-white: 255, 255, 255;
   --sl-color-gray-1: 238, 242, 247;

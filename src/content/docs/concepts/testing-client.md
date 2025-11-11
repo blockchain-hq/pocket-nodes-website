@@ -1,323 +1,352 @@
 ---
-title: Testing Client
-description: Learn how to use the x402test testing client
+title: x402 Client Node
+description: Make HTTP requests to x402-enabled APIs with automatic payment handling
 ---
 
+The x402 Client node is the core component for making payment-protected API requests in your n8n workflows. It automatically handles 402 responses, creates payments, and retries with payment proofs.
 
-The x402test client provides a fluent interface for making payment-protected HTTP requests with automatic payment handling.
+## Overview
 
-## Basic Usage
+The x402 Client node:
 
-```typescript
-import { x402 } from "x402test";
+- Detects 402 Payment Required responses
+- Automatically creates and signs payments
+- Retries requests with payment proof
+- Returns protected data to your workflow
+- Supports configurable payment limits
+- Works with all HTTP methods (GET, POST, PUT, DELETE)
 
-const response = await x402("http://localhost:4402/api/data")
-  .withPayment({ amount: "0.01" })
-  .expectStatus(200)
-  .execute();
+## Node Configuration
+
+### Wallet Source
+
+Choose how to provide wallet credentials:
+
+**Saved Wallet (Recommended)**
+
+- Connect Wallet Manager once, wallet is saved
+- Future executions use saved wallet automatically
+- Perfect for scheduled workflows
+
+**Private Key (Reusable)**
+
+- Enter your private key directly
+- Wallet reused across all executions
+- Great for trigger-based workflows
+
+**From Wallet Manager Node**
+
+- Live connection to Wallet Manager
+- Always uses latest wallet state
+- Best for dynamic wallet management
+
+**Auto-Generate Per Node**
+
+- Generates unique wallet per node
+- Requires funding each time
+- Not recommended for production
+
+### Resource URL
+
+The URL of the x402-enabled API endpoint:
+
+```
+https://api.example.com/premium-data
+http://localhost:3000/webhook/my-api
 ```
 
-## Client API
+### HTTP Method
 
-### Creating a Request
+Select the HTTP method for your request:
 
-```typescript
-import { x402, request } from "x402test";
+- GET - Retrieve data
+- POST - Send data
+- PUT - Update resource
+- DELETE - Remove resource
 
-// Using x402 (alias)
-const req1 = x402("http://localhost:4402/api/data");
+### Request Body
 
-// Using request (alias)
-const req2 = request("http://localhost:4402/api/data");
+For POST and PUT requests, specify the JSON body:
+
+```json
+{
+  "query": "example",
+  "limit": 10
+}
 ```
 
-### HTTP Methods
+Use n8n expressions for dynamic values:
 
-```typescript
-// GET (default)
-x402(url).get().execute();
-
-// POST
-x402(url).post({ data: "value" }).execute();
-
-// PUT
-x402(url).put({ data: "updated" }).execute();
-
-// DELETE
-x402(url).delete().execute();
+```json
+{
+  "userId": "{{$json.id}}",
+  "timestamp": "{{new Date().toISOString()}}"
+}
 ```
 
 ### Headers
 
-```typescript
-// Single header
-x402(url).header("Content-Type", "application/json").execute();
+Add custom HTTP headers:
 
-// Multiple headers
-x402(url)
-  .headers({
-    "Content-Type": "application/json",
-    Authorization: "Bearer token",
-  })
-  .execute();
+**Name**: `X-API-Key`
+**Value**: `your-api-key-here`
+
+Or use expressions:
+
+**Name**: `Authorization`
+**Value**: `Bearer {{$json.token}}`
+
+### Auto-Pay
+
+When enabled, the node automatically:
+
+1. Detects 402 responses
+2. Checks payment amount against limit
+3. Creates and signs payment
+4. Retries with payment proof
+5. Returns the protected data
+
+When disabled, the node will fail with an error if payment is required.
+
+### Max Payment Amount (USDC)
+
+Safety limit to prevent overspending:
+
+```
+Development: 0.10 USDC
+Production: 1.00 USDC
+High-value APIs: 5.00 USDC
 ```
 
-### Request Body
+If the API requires more than this amount, the node throws an error instead of paying.
 
-```typescript
-// Set body directly
-x402(url).body({ key: "value" }).execute();
+### Protocol Format
 
-// Body with POST
-x402(url).post({ key: "value" }).execute();
-```
+**Official X-402 Protocol** (Recommended)
 
-## Payment Methods
+- Standard x402 specification
+- Signature-based payment proof
+- No blockchain transaction needed (off-chain)
+- Fast and efficient
 
-### With Payment
+**Signed Transaction (Legacy)**
 
-```typescript
-// String amount
-x402(url).withPayment("0.01").execute();
+- Pre-signed Solana transaction
+- Compatible with custom implementations
+- Can be settled on-chain
+- Requires more setup
 
-// Object with amount
-x402(url).withPayment({ amount: "0.01" }).execute();
-```
+## Output Data
 
-### Without Payment
+The x402 Client node returns:
 
-```typescript
-// Request without payment (will get 402)
-const response = await x402(url).execute();
-console.log(response.status); // 402
-```
+### Successful Response
 
-## Assertions
-
-### Status Code
-
-```typescript
-// Expect specific status
-await x402(url).withPayment("0.01").expectStatus(200).execute();
-
-// Error if status doesn't match
-await x402(url).withPayment("0.01").expectStatus(404).execute();
-// Throws: "Expected status 404 but got 200"
-```
-
-### Payment Settled
-
-```typescript
-// Verify payment on blockchain
-await x402(url).withPayment("0.01").expectPaymentSettled().execute();
-```
-
-### Payment Amount
-
-```typescript
-// Verify exact amount paid
-await x402(url)
-  .withPayment("0.01")
-  .expectPaymentAmount("10000") // atomic units
-  .execute();
-```
-
-### Response Body
-
-```typescript
-// Exact match
-await x402(url).withPayment("0.01").expectBody({ key: "value" }).execute();
-
-// Custom validation
-await x402(url)
-  .withPayment("0.01")
-  .expectBody((body) => {
-    return body.data && body.data.length > 0;
-  })
-  .execute();
-```
-
-### Response Headers
-
-```typescript
-// Exact header value
-await x402(url)
-  .withPayment("0.01")
-  .expectHeader("Content-Type", "application/json")
-  .execute();
-
-// Regex match
-await x402(url)
-  .withPayment("0.01")
-  .expectHeader("Content-Type", /application\/json/)
-  .execute();
-```
-
-## Response Object
-
-### Structure
-
-```typescript
-interface X402Response<T> {
-  status: number;
-  statusText: string;
-  headers: Headers;
-  body: T;
-  payment?: {
-    signature: string;
-    amount: string;
-    from: string;
-    to: string;
-  };
-}
-```
-
-### Accessing Response Data
-
-```typescript
-const response = await x402(url).withPayment("0.01").execute();
-
-// Status
-console.log(response.status); // 200
-console.log(response.statusText); // "OK"
-
-// Headers
-console.log(response.headers.get("Content-Type"));
-
-// Body
-console.log(response.body);
-
-// Payment details
-if (response.payment) {
-  console.log("Signature:", response.payment.signature);
-  console.log("Amount:", response.payment.amount);
-  console.log("From:", response.payment.from);
-  console.log("To:", response.payment.to);
-}
-```
-
-## Error Handling
-
-### Try-Catch
-
-```typescript
-try {
-  const response = await x402(url)
-    .withPayment("0.01")
-    .expectStatus(200)
-    .execute();
-} catch (error) {
-  if (error instanceof X402Error) {
-    console.error("Payment error:", error.message);
-  } else if (error instanceof AssertionError) {
-    console.error("Assertion failed:", error.message);
-  } else {
-    console.error("Unknown error:", error);
+```json
+{
+  "data": {
+    // API response data
+  },
+  "_x402Payment": {
+    "amount": "0.01",
+    "currency": "USDC",
+    "recipient": "ABC123...",
+    "sender": "9rKnvE7...",
+    "network": "solana-devnet",
+    "timestamp": "2024-01-15T10:30:00.000Z"
   }
 }
 ```
 
-### Error Types
+### Free Endpoint (No Payment)
 
-```typescript
-import {
-  X402Error,
-  X402ParseError,
-  PaymentCreationError,
-  PaymentVerificationError,
-  AssertionError,
-} from "x402test";
+If the endpoint doesn't require payment (returns 200 immediately):
 
-// X402Error - General errors
-// X402ParseError - Failed to parse 402 response
-// PaymentCreationError - Failed to create payment
-// PaymentVerificationError - Payment verification failed
-// AssertionError - Expectation not met
+```json
+{
+  "result": "data from API"
+  // No _x402Payment field
+}
 ```
 
-## Advanced Usage
+## Using the Output
 
-### Multiple Assertions
+Access data in subsequent nodes:
 
-```typescript
-await x402(url)
-  .withPayment("0.01")
-  .expectStatus(200)
-  .expectPaymentSettled()
-  .expectHeader("Content-Type", "application/json")
-  .expectBody((body) => body.success === true)
-  .execute();
+### Get API Data
+
+```javascript
+{
+  {
+    $json.data;
+  }
+}
 ```
 
-### Sequential Requests
+### Get Payment Amount
 
-```typescript
-// Request 1
-const response1 = await x402("http://localhost:4402/api/data")
-  .withPayment("0.01")
-  .execute();
-
-// Request 2 (different endpoint)
-const response2 = await x402("http://localhost:4402/api/premium")
-  .withPayment("0.10")
-  .execute();
+```javascript
+{
+  {
+    $json._x402Payment.amount;
+  }
+}
 ```
 
-### Custom Wallets
+### Check if Payment Was Made
 
-```typescript
-import { getWallet, resetWallets } from "x402test";
-
-// Get current wallet
-const wallet = await getWallet();
-console.log("Address:", wallet.publicKey.toBase58());
-console.log("Balance:", wallet.balance);
-
-// Reset wallets (creates new ones)
-await resetWallets();
+```javascript
+{
+  {
+    $json._x402Payment !== undefined;
+  }
+}
 ```
 
-## Integration with Testing Frameworks
+### Get Transaction Timestamp
 
-### Vitest
-
-```typescript
-import { describe, it, expect, beforeAll } from "vitest";
-import { x402 } from "x402test";
-
-describe("Payment API", () => {
-  it("should process payment", async () => {
-    const response = await x402("http://localhost:4402/api/data")
-      .withPayment("0.01")
-      .expectStatus(200)
-      .execute();
-
-    expect(response.payment).toBeDefined();
-    expect(response.body).toHaveProperty("data");
-  });
-});
+```javascript
+{
+  {
+    $json._x402Payment.timestamp;
+  }
+}
 ```
 
-### Jest
+## Common Patterns
 
-```typescript
-import { x402 } from "x402test";
+### Call Single API
 
-describe("Payment API", () => {
-  test("should process payment", async () => {
-    const response = await x402("http://localhost:4402/api/data")
-      .withPayment("0.01")
-      .expectStatus(200)
-      .execute();
-
-    expect(response.payment).toBeDefined();
-    expect(response.body).toHaveProperty("data");
-  });
-});
+```
+[Trigger]
+    ↓
+[x402 Wallet Manager]
+    ↓
+[x402 Client]
+  - URL: https://api.example.com/data
+    ↓
+[Process Data]
 ```
 
-## Next Steps
+### Call Multiple APIs
 
-- [Mock Server](/mock-server) - Set up the test server
-- [API Reference](/api/client) - Complete API documentation
-- [Examples](/examples/basic-payment) - See more examples
+```
+[Trigger]
+    ↓
+[x402 Wallet Manager]
+    ↓
+[x402 Client 1] Premium Data (0.01 USDC)
+    ↓
+[x402 Client 2] Analytics (0.05 USDC)
+    ↓
+[Merge Results]
+```
+
+### Conditional Payment
+
+```
+[Trigger]
+    ↓
+[x402 Wallet Manager]
+    ↓
+[IF] Balance > 1 USDC?
+    ├─ YES → [x402 Client] Call paid API
+    └─ NO → [Send Alert] Low balance
+```
+
+### Mix Free and Paid APIs
+
+```
+[Trigger]
+    ↓
+[HTTP Request] Free endpoint (no payment)
+    ↓
+[x402 Client] Paid endpoint (with payment)
+    ↓
+[Combine Data]
+```
+
+## Advanced Options
+
+### Show Transaction Details
+
+Enable to include additional payment metadata in output:
+
+```json
+{
+  "_x402Payment": {
+    "amount": "0.01",
+    "scheme": "exact",
+    "resource": "/api/premium-data"
+    // ... more details
+  }
+}
+```
+
+### Clear Saved Wallet
+
+Only for "Saved Wallet" mode. Clears the saved wallet so you can set up a new one.
+
+### Reset Wallet
+
+Only for "Auto-Generate" mode. Generates a new wallet for this node.
+
+## Troubleshooting
+
+### "No wallet data found"
+
+**Problem**: Client can't access wallet
+
+**Solutions**:
+
+- Ensure Wallet Manager is connected (for "From Wallet Manager" mode)
+- Check saved wallet exists (for "Saved Wallet" mode)
+- Enter private key (for "Private Key" mode)
+
+### "Insufficient balance"
+
+**Problem**: Not enough USDC or SOL
+
+**Solutions**:
+
+1. Run Wallet Manager alone
+2. Check balances in output
+3. Fund wallet at faucets (devnet) or send funds (mainnet)
+4. Re-run workflow
+
+### "Payment exceeds limit"
+
+**Problem**: API requires more than max allowed
+
+**Solutions**:
+
+- Increase "Max Payment Amount" if acceptable
+- Use a different API
+- Check API pricing documentation
+
+### "Payment rejected by server"
+
+**Problem**: Server didn't accept payment
+
+**Solutions**:
+
+- Check console logs for details
+- Verify network matches (both devnet or both mainnet)
+- Ensure wallet has sufficient balance
+- Try with "Official X-402 Protocol" format
+
+## Best Practices
+
+1. **Always set payment limits** to prevent overspending
+2. **Use Saved Wallet** for production workflows
+3. **Monitor balances** regularly
+4. **Test on devnet** before mainnet
+5. **Enable "Continue On Fail"** for error handling
+6. **Log payment details** for auditing
+
+## What's Next?
+
+- [Wallet Manager](/api/wallets/) - Managing wallets
+- [Mock Server](/concepts/mock-server/) - Testing setup
+- [Error Handling](/examples/error-handling/) - Handle failures
+- [Multiple Endpoints](/examples/multiple-endpoints/) - Advanced patterns

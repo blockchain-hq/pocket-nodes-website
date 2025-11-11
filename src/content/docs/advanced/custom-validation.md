@@ -1,313 +1,450 @@
 ---
 title: Custom Validation
-description: Implement custom validation logic for your payment flows
+description: Add custom validation logic to your x402 workflows
 ---
 
+Learn how to add custom validation and business logic to your x402 payment workflows in n8n.
 
-Extend x402test with custom validation logic for requests, responses, and payments.
+## Validation Scenarios
 
-## Client-Side Validation
+### Pre-Payment Validation
 
-### Custom Response Validation
+Validate before making payment:
 
-Validate response data with custom logic:
-
-```typescript
-import { x402 } from "x402test";
-
-const response = await x402(url)
-  .withPayment("0.01")
-  .expectBody((body) => {
-    // Custom validation logic
-    if (!body.data) return false;
-    if (body.data.length === 0) return false;
-    if (!body.timestamp) return false;
-
-    return true;
-  })
-  .execute();
+```
+[x402 Wallet Manager]
+    ↓
+[Validate Conditions]
+  - Check balance
+  - Check price
+  - Check API availability
+    ↓
+[IF] All valid?
+    ├─ YES → [x402 Client] Make payment
+    └─ NO → [Skip] Log reason
 ```
 
-### Schema Validation with Zod
+### Post-Payment Validation
 
-Use Zod for type-safe response validation:
+Validate after payment:
 
-```typescript
-import { z } from "zod";
-import { x402 } from "x402test";
-
-const ResponseSchema = z.object({
-  data: z.string(),
-  timestamp: z.number(),
-  metadata: z.object({
-    version: z.string(),
-    format: z.string(),
-  }),
-});
-
-const response = await x402(url)
-  .withPayment("0.01")
-  .expectBody((body) => {
-    try {
-      ResponseSchema.parse(body);
-      return true;
-    } catch {
-      return false;
-    }
-  })
-  .execute();
-
-// Type-safe response
-const validated = ResponseSchema.parse(response.body);
-console.log(validated.data); // TypeScript knows this is a string
+```
+[x402 Client]
+    ↓
+[Validate Response]
+  - Check data quality
+  - Verify expected format
+  - Validate business rules
+    ↓
+[IF] Valid?
+    ├─ YES → [Process Data]
+    └─ NO → [Log Issue] Payment made but data invalid
 ```
 
-### Multiple Validators
+## Balance Validation
 
-Chain multiple validation checks:
-
-```typescript
-class ResponseValidator {
-  private validators: Array<(body: any) => boolean> = [];
-
-  add(validator: (body: any) => boolean): this {
-    this.validators.push(validator);
-    return this;
-  }
-
-  validate(body: any): boolean {
-    return this.validators.every((validator) => validator(body));
-  }
-}
-
-// Usage
-const validator = new ResponseValidator()
-  .add((body) => body.data !== undefined)
-  .add((body) => body.timestamp > Date.now() - 60000)
-  .add((body) => body.metadata?.version === "1.0");
-
-const response = await x402(url)
-  .withPayment("0.01")
-  .expectBody((body) => validator.validate(body))
-  .execute();
-```
-
-## Server-Side Validation
-
-### Request Parameter Validation
-
-Validate query parameters in your mock server:
+### Ensure Sufficient Balance
 
 ```javascript
-// x402test.config.js
-export default {
-  routes: {
-    "/api/users": {
-      price: "0.01",
-      response: (req) => {
-        // Validate query parameters
-        if (!req.query.userId) {
-          return { error: "userId required", status: 400 };
-        }
+// In Code node before Client
+const balance = $json.balances.usdc;
+const maxPayment = 0.1; // From Client config
+const minimumBuffer = 0.5; // Safety buffer
 
-        // Validate format
-        if (!/^\d+$/.test(req.query.userId)) {
-          return { error: "Invalid userId format", status: 400 };
-        }
-
-        // Return data
-        return {
-          user: {
-            id: req.query.userId,
-            name: "User " + req.query.userId,
-          },
-        };
-      },
+if (balance < maxPayment + minimumBuffer) {
+  return {
+    json: {
+      error: "Insufficient balance for payment + buffer",
+      currentBalance: balance,
+      required: maxPayment + minimumBuffer,
+      action: "fund_wallet",
     },
+  };
+}
+
+// Balance is sufficient - continue
+return { json: { balanceOk: true } };
+```
+
+### Daily Spending Limit
+
+```javascript
+// Custom daily limit enforcement
+const staticData = $getWorkflowStaticData("global");
+const today = new Date().toISOString().split("T")[0];
+const spendingKey = `daily_spending_${today}`;
+
+const todaySpending = staticData[spendingKey] || 0;
+const dailyLimit = 5.0; // 5 USDC per day
+
+if (todaySpending >= dailyLimit) {
+  throw new Error(`Daily limit reached: ${todaySpending}/${dailyLimit} USDC`);
+}
+
+// After Client node executes successfully
+if ($json._x402Payment) {
+  const paid = parseFloat($json._x402Payment.amount);
+  staticData[spendingKey] = todaySpending + paid;
+}
+```
+
+## Price Validation
+
+### Check Price Before Paying
+
+```javascript
+// After receiving 402, before paying
+// This requires modifying workflow to capture 402 response
+
+const staticData = $getWorkflowStaticData("global");
+const maxAcceptablePrice = 0.1;
+
+// Simulated: If you could access 402 response
+const requiredAmount = 0.15; // From 402 response
+
+if (requiredAmount > maxAcceptablePrice) {
+  return {
+    json: {
+      action: "price_too_high",
+      required: requiredAmount,
+      maximum: maxAcceptablePrice,
+      decision: "skip_request",
+    },
+  };
+}
+```
+
+**Note**: x402 Client checks this automatically with "Max Payment Amount" setting.
+
+### Dynamic Price Limits
+
+```javascript
+// Set different limits based on user tier
+const userTier = $json.userTier; // From previous node
+
+let maxPayment;
+switch (userTier) {
+  case "free":
+    maxPayment = 0.05;
+    break;
+  case "basic":
+    maxPayment = 0.25;
+    break;
+  case "premium":
+    maxPayment = 1.0;
+    break;
+  case "enterprise":
+    maxPayment = 5.0;
+    break;
+  default:
+    maxPayment = 0.1;
+}
+
+// Pass to Client node via dynamic config
+// (requires using expressions in Client node settings)
+```
+
+## Response Validation
+
+### Validate Data Quality
+
+```javascript
+// In Code node after x402 Client
+const response = $json;
+
+// Check response structure
+if (!response.data || typeof response.data !== "object") {
+  return {
+    json: {
+      error: "Invalid response structure",
+      paidAmount: $json._x402Payment?.amount,
+      action: "log_data_quality_issue",
+    },
+  };
+}
+
+// Check required fields
+if (!response.data.results || response.data.results.length === 0) {
+  return {
+    json: {
+      error: "Empty results from paid API",
+      paidAmount: $json._x402Payment?.amount,
+      action: "contact_api_support",
+    },
+  };
+}
+
+// Data is valid
+return {
+  json: {
+    validated: true,
+    data: response.data,
   },
 };
 ```
 
-### Request Body Validation
-
-Validate POST/PUT request bodies:
+### Validate Business Rules
 
 ```javascript
-routes: {
-  '/api/create': {
-    price: '0.05',
-    response: (req) => {
-      const { name, email, age } = req.body;
+// Example: Validate AI response quality
+const aiResponse = $json.result;
+const paymentAmount = parseFloat($json._x402Payment.amount);
 
-      // Required fields
-      if (!name || !email) {
-        return {
-          error: 'name and email are required',
-          status: 400
-        };
-      }
+// For expensive calls, require minimum quality
+if (paymentAmount >= 0.1) {
+  const confidence = aiResponse.confidence || 0;
+  const minConfidence = 0.85;
 
-      // Email format
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        return {
-          error: 'Invalid email format',
-          status: 400
-        };
-      }
-
-      // Age range
-      if (age && (age < 18 || age > 120)) {
-        return {
-          error: 'Age must be between 18 and 120',
-          status: 400
-        };
-      }
-
-      // Valid request - return 201 Created
-      return {
-        status: 201,
-        user: { name, email, age }
-      };
-    }
-  }
-}
-```
-
-### Header Validation
-
-Validate request headers:
-
-```javascript
-routes: {
-  '/api/authenticated': {
-    price: '0.02',
-    response: (req) => {
-      // Check API key
-      const apiKey = req.headers['x-api-key'];
-      if (!apiKey || apiKey !== process.env.API_KEY) {
-        return {
-          error: 'Invalid API key',
-          status: 401
-        };
-      }
-
-      // Check content type
-      if (req.headers['content-type'] !== 'application/json') {
-        return {
-          error: 'Content-Type must be application/json',
-          status: 415
-        };
-      }
-
-      return { data: 'Authenticated data' };
-    }
-  }
-}
-```
-
-## Payment Validation
-
-### Custom Amount Validation
-
-Validate payment amounts are within acceptable ranges:
-
-```typescript
-import { verifyPayment } from "x402test";
-
-async function verifyPaymentInRange(
-  signature: string,
-  recipient: PublicKey,
-  minAmount: bigint,
-  maxAmount: bigint,
-  mint: PublicKey
-): Promise<VerificationResult> {
-  // Standard verification
-  const result = await verifyPayment(signature, recipient, minAmount, mint);
-
-  if (!result.isValid) {
-    return result;
-  }
-
-  // Check maximum amount
-  const amount = BigInt(result.amount || "0");
-  if (amount > maxAmount) {
+  if (confidence < minConfidence) {
     return {
-      isValid: false,
-      invalidReason: `Amount ${amount} exceeds maximum ${maxAmount}`,
+      json: {
+        error: "Low confidence result from expensive API",
+        confidence: confidence,
+        minimum: minConfidence,
+        paidAmount: paymentAmount,
+        action: "retry_or_refund",
+      },
     };
   }
+}
 
-  return result;
+// Quality is acceptable
+return { json: { qualityOk: true, data: aiResponse } };
+```
+
+## Conditional Payments
+
+### Pay Only If Necessary
+
+```
+[Get Data from Free API]
+    ↓
+[IF] Data is insufficient?
+    ├─ YES → [x402 Client] Get premium data
+    └─ NO → [Use Free Data]
+```
+
+### Budget-Based Decisions
+
+```
+[Check Wallet Balance]
+    ↓
+[IF] Balance > 10 USDC?
+    ├─ YES → [x402 Client] Use premium (expensive) API
+    └─ NO → [x402 Client] Use standard (cheap) API
+```
+
+### Time-Based Limits
+
+```javascript
+// Only pay for premium data during business hours
+const hour = new Date().getHours();
+const isBusinessHours = hour >= 9 && hour < 17;
+
+if (isBusinessHours) {
+  // Use premium paid API
+  return { json: { usePremium: true } };
+} else {
+  // Use free or cheaper API
+  return { json: { usePremium: false } };
 }
 ```
 
-### Time-Based Validation
+## Rate Limiting
 
-Ensure payments are recent:
+### Prevent Excessive Spending
 
-```typescript
-interface TimedPaymentRequirements {
-  signature: string;
-  timestamp: number;
-  maxAge: number; // seconds
+```javascript
+// In Code node before Client
+const staticData = $getWorkflowStaticData("global");
+const hour = new Date().getHours();
+const hourKey = `payments_hour_${hour}`;
+
+const paymentsThisHour = staticData[hourKey] || 0;
+const maxPaymentsPerHour = 10;
+
+if (paymentsThisHour >= maxPaymentsPerHour) {
+  throw new Error(
+    `Hourly payment limit reached: ${paymentsThisHour}/${maxPaymentsPerHour}`
+  );
 }
 
-function validatePaymentAge(payment: TimedPaymentRequirements): boolean {
-  const age = (Date.now() - payment.timestamp) / 1000;
+// After successful payment
+staticData[hourKey] = paymentsThisHour + 1;
 
-  if (age > payment.maxAge) {
-    throw new Error(`Payment expired: ${age}s > ${payment.maxAge}s`);
+// Cleanup old hours
+const currentHour = new Date().getHours();
+for (let h = 0; h < 24; h++) {
+  if (h !== currentHour) {
+    delete staticData[`payments_hour_${h}`];
   }
-
-  return true;
 }
 ```
 
-## Integration Testing
+### Throttling
 
-Test your custom validation:
+```javascript
+// Limit to one payment per minute per endpoint
+const lastPaymentKey = `last_payment_${apiEndpoint}`;
+const lastPayment = staticData[lastPaymentKey];
 
-```typescript
-import { describe, it, expect } from "vitest";
-import { x402 } from "x402test";
+if (lastPayment) {
+  const timeSince = Date.now() - lastPayment;
+  if (timeSince < 60000) {
+    // 60 seconds
+    throw new Error(`Throttled: wait ${60 - Math.floor(timeSince / 1000)}s`);
+  }
+}
 
-describe("Custom Validation", () => {
-  it("should validate response schema", async () => {
-    const response = await x402("http://localhost:4402/api/data")
-      .withPayment("0.01")
-      .expectBody((body) => {
-        return (
-          typeof body.data === "string" &&
-          typeof body.timestamp === "number" &&
-          body.timestamp > 0
-        );
-      })
-      .execute();
-
-    expect(response.body.data).toBeDefined();
-  });
-
-  it("should reject invalid responses", async () => {
-    await expect(
-      x402("http://localhost:4402/api/invalid")
-        .withPayment("0.01")
-        .expectBody((body) => body.requiredField !== undefined)
-        .execute()
-    ).rejects.toThrow("Body validation failed");
-  });
-});
+// After payment
+staticData[lastPaymentKey] = Date.now();
 ```
 
-## Best Practices
+## Validation Workflows
 
-1. **Validate Early**: Check inputs before processing
-2. **Clear Errors**: Return descriptive error messages
-3. **Type Safety**: Use TypeScript and schema validation
-4. **Security First**: Never trust client input
-5. **Performance**: Keep validation logic efficient
+### Complete Validation Flow
 
-## Next Steps
+```
+[Trigger]
+    ↓
+[Wallet Manager]
+    ↓
+[Validate Balance] > 1 USDC?
+    ├─ NO → [Alert & Exit]
+    └─ YES ↓
+            [Check Daily Limit] < 5 USDC spent today?
+                ├─ NO → [Alert & Exit]
+                └─ YES ↓
+                        [Check Rate Limit] < 10 requests/hour?
+                            ├─ NO → [Throttle & Wait]
+                            └─ YES ↓
+                                    [x402 Client]
+                                        ↓
+                                    [Validate Response] Data quality OK?
+                                        ├─ NO → [Log Issue]
+                                        └─ YES ↓
+                                                [Process Data]
+```
 
-- [Configuration](/advanced/configuration/) - Advanced server configuration
-- [API Reference](/api/client/) - Complete API documentation
+## Wallet Validation
+
+### Verify Wallet is Ready
+
+```javascript
+// From Wallet Manager output
+const wallet = $json;
+
+// Validate status
+if (!wallet.ready) {
+  throw new Error(`Wallet not ready: ${wallet.status}`);
+}
+
+// Validate balance minimums
+if (wallet.balances.usdc < 1.0) {
+  throw new Error(`USDC too low: ${wallet.balances.usdc}`);
+}
+
+if (wallet.balances.sol < 0.01) {
+  throw new Error(`SOL too low: ${wallet.balances.sol}`);
+}
+
+// Wallet is valid
+return { json: { walletValid: true } };
+```
+
+### Network Validation
+
+```javascript
+// Ensure wallet and client on same network
+const walletNetwork = $json.network; // From Wallet Manager
+const expectedNetwork = "solana-devnet";
+
+if (walletNetwork !== expectedNetwork) {
+  throw new Error(
+    `Network mismatch: wallet on ${walletNetwork}, expected ${expectedNetwork}`
+  );
+}
+```
+
+## API Response Validation
+
+### Schema Validation
+
+```javascript
+// Validate response matches expected schema
+const response = $json;
+
+const schema = {
+  status: "string",
+  data: "object",
+  timestamp: "string",
+};
+
+for (const [field, type] of Object.entries(schema)) {
+  if (typeof response[field] !== type) {
+    throw new Error(`Invalid response: ${field} should be ${type}`);
+  }
+}
+
+// Schema valid
+return { json: response };
+```
+
+### Content Validation
+
+```javascript
+// Validate API returned useful data
+const results = $json.data.results;
+
+if (!Array.isArray(results)) {
+  throw new Error("Expected array of results");
+}
+
+if (results.length === 0) {
+  throw new Error("Empty results from paid API");
+}
+
+// Check result quality
+const avgConfidence =
+  results.reduce((sum, r) => sum + r.confidence, 0) / results.length;
+
+if (avgConfidence < 0.7) {
+  throw new Error(`Low quality results: ${avgConfidence} confidence`);
+}
+```
+
+## Payment Metadata Validation
+
+### Verify Payment Details
+
+```javascript
+// After Client node
+const payment = $json._x402Payment;
+
+if (!payment) {
+  throw new Error("Payment metadata missing - was this a free endpoint?");
+}
+
+// Validate payment matches expectations
+if (payment.currency !== "USDC") {
+  throw new Error(`Wrong currency: ${payment.currency}`);
+}
+
+if (payment.network !== "solana-devnet") {
+  throw new Error(`Wrong network: ${payment.network}`);
+}
+
+const maxExpected = 0.1;
+if (parseFloat(payment.amount) > maxExpected) {
+  throw new Error(
+    `Payment higher than expected: ${payment.amount} > ${maxExpected}`
+  );
+}
+```
+
+## What's Next?
+
+- [Configuration](/advanced/configuration/) - Advanced settings
+- [Replay Protection](/advanced/replay-protection/) - Security details
+- [Error Handling](/examples/error-handling/) - Handle validation failures
 - [Examples](/examples/basic-payment/) - See validation in action

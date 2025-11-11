@@ -1,160 +1,189 @@
 ---
 title: Installation
-description: Install x402test and set up your testing environment
+description: Install x402 Pocket Nodes in your n8n instance
 ---
 
-
-This guide will walk you through installing x402test and setting up your development environment.
+This guide will walk you through installing x402 Pocket Nodes in your n8n instance.
 
 ## Prerequisites
 
-Before installing x402test, make sure you have:
+Before installing x402 Pocket Nodes, make sure you have:
 
-- **Node.js**: Version 18 or higher
-- **pnpm**, **npm**, or **yarn**: Package manager
-- **Solana CLI** (optional): For running a local validator
+- **n8n**: Self-hosted or cloud instance
+- **Access**: Admin access to install community nodes
 
-## Install x402test
+## Option 1: Install via n8n UI (Recommended)
 
-Add x402test to your project as a development dependency:
+This is the easiest way to install x402 Pocket Nodes.
 
-```bash
-pnpm add -D x402test
+### Step 1: Open Community Nodes Settings
 
-npm install --save-dev x402test
+1. Open your n8n instance
+2. Click on **Settings** in the sidebar
+3. Navigate to **Community Nodes**
 
-yarn add -D x402test
-```
+### Step 2: Install the Package
 
-## Initialize Configuration
+1. Click **Install a community node**
+2. Enter the package name:
+   ```
+   @blockchain-hq/n8n-nodes-x402-pocket
+   ```
+3. Click **Install**
+4. Wait for the installation to complete
 
-Run the initialization command to create a configuration file and test wallet:
+### Step 3: Restart n8n
 
-```bash
-npx x402test init
-```
-
-This will:
-
-- Create a `x402test.config.js` configuration file
-- Generate a test wallet with auto-funded USDC
-- Save wallet information to `.x402test-wallets.json`
-
-### Configuration File
-
-The generated configuration file looks like this:
-
-```javascript
-// x402test.config.js
-export default {
-  port: 4402,
-  network: "solana-devnet",
-  rpcUrl: "http://localhost:8899",
-
-  recipient: "YOUR_WALLET_ADDRESS",
-
-  routes: {
-    "/api/premium": {
-      price: "0.10",
-      description: "Premium content access",
-      response: {
-        data: "This is premium content!",
-        timestamp: Date.now(),
-      },
-    },
-
-    "/api/data": {
-      price: "0.01",
-      description: "Data API access",
-      response: (req) => ({
-        method: req.method,
-        path: req.path,
-        data: { message: "Your data here" },
-      }),
-    },
-  },
-};
-```
-
-## Set Up Local Solana Validator
-
-For local testing, you'll need a Solana test validator:
-
-### Install Solana CLI
+Restart your n8n instance to load the new nodes:
 
 ```bash
-sh -c "$(curl -sSfL https://release.solana.com/stable/install)"
+# If using systemd
+sudo systemctl restart n8n
+
+# If using Docker
+docker restart n8n
+
+# If using pm2
+pm2 restart n8n
 ```
 
-### Start Test Validator
+### Step 4: Verify Installation
+
+1. Create a new workflow
+2. Click the **+** button to add a node
+3. Search for "x402"
+4. You should see three nodes:
+   - x402 Wallet Manager
+   - x402 Client
+   - x402 Mock Server
+
+## Option 2: Manual Installation
+
+For self-hosted n8n instances, you can install manually.
+
+### Install via npm
 
 ```bash
-solana-test-validator
+cd ~/.n8n/nodes
+npm install @blockchain-hq/n8n-nodes-x402-pocket
 ```
 
-The validator should run on `http://localhost:8899` by default.
-
-### Verify Installation
-
-Check that the validator is running:
+### Install via pnpm
 
 ```bash
-solana cluster-version --url http://localhost:8899
+cd ~/.n8n/nodes
+pnpm add @blockchain-hq/n8n-nodes-x402-pocket
 ```
 
-## Verify x402test Installation
+### Restart n8n
 
-Test your installation by starting the mock server:
+After installation, restart your n8n instance:
 
 ```bash
-npx x402test start
+# Restart your n8n process
+pm2 restart n8n
+# or
+systemctl restart n8n
+# or restart your Docker container
 ```
 
-You should see output like:
+## The Three Nodes
 
+After installation, you'll have access to these nodes:
+
+### x402 Wallet Manager
+
+Generate and manage Solana wallets for payments.
+
+**Use for:**
+
+- Initial wallet setup
+- Checking balances
+- Providing wallet to Client nodes
+
+### x402 Client
+
+Make HTTP requests to x402-enabled APIs with automatic payment.
+
+**Use for:**
+
+- Calling paid APIs
+- Automatic payment handling
+- Integration with existing workflows
+
+### x402 Mock Server
+
+Test x402 integration without real transactions.
+
+**Use for:**
+
+- Development and testing
+- Learning the protocol
+- Validating workflows before production
+
+## Troubleshooting
+
+### Nodes Not Appearing
+
+If the nodes don't appear after installation:
+
+1. **Check installation status**:
+
+   - Go to Settings → Community Nodes
+   - Verify the package is listed as installed
+
+2. **Restart n8n completely**:
+
+   ```bash
+   # Stop n8n
+   pm2 stop n8n
+   # Start n8n
+   pm2 start n8n
+   ```
+
+3. **Check n8n logs**:
+   ```bash
+   # View logs
+   pm2 logs n8n
+   # or
+   journalctl -u n8n -f
+   ```
+
+### Installation Failed
+
+If installation fails:
+
+1. **Check n8n version**: Requires n8n v1.0.0 or higher
+2. **Check permissions**: Ensure n8n has write access to `~/.n8n/nodes`
+3. **Check network**: Ensure your server can access npm registry
+4. **Try manual installation**: Use the manual method above
+
+### Permission Denied
+
+If you get permission errors:
+
+```bash
+# Fix permissions
+sudo chown -R $USER:$USER ~/.n8n/nodes
 ```
-✔ x402test Mock Server Started
-   Port: 4402
-   Network: solana-devnet
-   Recipient: YOUR_WALLET_ADDRESS
 
-✔ Configured Routes:
-   /api/premium
-     Price: 0.10 USDC
-     Description: Premium content access
-   /api/data
-     Price: 0.01 USDC
-     Description: Data API access
+## Verifying Installation
 
-✔ Ready to accept payments at http://localhost:4402
-```
+Create a test workflow to verify everything works:
 
-## Project Structure
+1. **Create new workflow**
+2. **Add Manual Trigger node**
+3. **Add x402 Wallet Manager node**
+   - Set Network to "Devnet"
+   - Set Action to "Get Wallet Info"
+4. **Execute the workflow**
 
-After initialization, your project should have:
-
-```
-your-project/
-├── x402test.config.js          # Configuration file
-├── .x402test-wallets.json      # Test wallets (auto-generated)
-├── .x402test-signatures.json   # Used signatures (auto-generated)
-└── package.json
-```
-
-## Git Ignore
-
-Add these files to your `.gitignore`:
-
-```
-.x402test-wallets.json
-.x402test-signatures.json
-x402test.config.js  # Optional: commit if you want to share config
-```
+If you see wallet information in the output, the installation was successful!
 
 ## Next Steps
 
-Now that you have x402test installed:
+Now that you have x402 Pocket Nodes installed:
 
-- [Quick Start Guide](/quick-start) - Make your first payment request
-- [How x402 Works](/how-it-works) - Understand the payment flow
-- [CLI Reference](/cli/overview) - Learn all CLI commands
+- [Quick Start](/getting-started/quick-start/) - Create your first workflow
+- [Wallet Setup](/concepts/wallet-setup/) - Fund your wallet
+- [Basic Payment Example](/examples/basic-payment/) - Make your first payment

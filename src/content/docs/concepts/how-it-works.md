@@ -1,287 +1,351 @@
 ---
 title: How x402 Works
-description: Understand the x402 payment protocol and how x402test implements it
+description: Understanding the x402 payment protocol and how it integrates with n8n
 ---
 
-
-The x402 protocol is an extension of the HTTP 402 Payment Required status code, enabling micropayments for API access using blockchain transactions.
+The x402 protocol enables micropayments for API access using HTTP status code 402 Payment Required. Here's how x402 Pocket Nodes makes this seamless in n8n workflows.
 
 ## The x402 Protocol
 
 ### HTTP 402 Payment Required
 
-The HTTP 402 status code was reserved for future payment systems. The x402 protocol uses this status code to indicate that payment is required before accessing a resource.
+The HTTP 402 status code was reserved for future digital payment systems. The x402 protocol implements this vision:
 
-### Payment Flow
+- **API charges per request** instead of subscriptions
+- **Micropayments** enable pay-as-you-go pricing
+- **Blockchain settlement** ensures transparency and security
+- **No accounts needed** - just a crypto wallet
 
-```mermaid
-sequenceDiagram
-    Client->>Server: GET /api/premium
-    Server->>Client: 402 Payment Required + Requirements
-    Client->>Blockchain: Create & Sign Transaction
-    Blockchain->>Client: Transaction Signature
-    Client->>Server: GET /api/premium + X-PAYMENT Header
-    Server->>Blockchain: Verify Transaction
-    Blockchain->>Server: Transaction Confirmed
-    Server->>Client: 200 OK + Protected Content
+## Payment Flow in n8n
+
+Here's what happens when your n8n workflow makes a payment-protected API request:
+
+### 1. Initial Request (No Payment)
+
+```
+[x402 Client Node]
+    ↓
+GET https://api.example.com/premium-data
+Headers: { Accept: "application/json" }
 ```
 
-## Step-by-Step Flow
+The client makes a standard HTTP request without any payment information.
 
-### 1. Initial Request
+### 2. Server Returns 402 Payment Required
 
-The client makes a request to a payment-protected endpoint:
-
-```typescript
-const response = await fetch("http://localhost:4402/api/premium");
 ```
+HTTP/1.1 402 Payment Required
+Content-Type: application/json
 
-### 2. Payment Required Response
-
-The server responds with a 402 status code and payment requirements:
-
-```json
 {
   "x402Version": 1,
-  "accepts": [
-    {
-      "scheme": "solanaTransferChecked",
-      "network": "solana-devnet",
-      "maxAmountRequired": "100000",
-      "resource": "http://localhost:4402/api/premium",
-      "description": "Premium content access",
-      "payTo": "FcxKSp...",
-      "asset": "EPjFWdd...",
-      "maxTimeoutSeconds": 30
-    }
-  ],
-  "error": null
+  "accepts": [{
+    "scheme": "exact",
+    "network": "solana-devnet",
+    "maxAmountRequired": "10000",
+    "resource": "/premium-data",
+    "description": "Premium data access",
+    "payTo": "ABC123xyz...",
+    "asset": "4zMMC9srt5...",
+    "maxTimeoutSeconds": 300
+  }]
 }
 ```
 
-### 3. Payment Creation
+The server responds with:
 
-The client creates a Solana SPL token transfer:
+- **Payment amount** required (in smallest units)
+- **Recipient wallet** address
+- **Token/asset** to use (USDC mint address)
+- **Network** (Solana devnet/mainnet)
+- **Timeout** for payment validity
 
-```typescript
-import { x402 } from "x402test";
+### 3. x402 Client Detects 402
 
-const response = await x402("http://localhost:4402/api/premium")
-  .withPayment({ amount: "0.10" })
-  .execute();
-```
+The x402 Client node automatically:
 
-Behind the scenes:
+- Detects the 402 status code
+- Parses the payment requirements
+- Checks if payment amount is within limits
 
-- Creates a token transfer instruction
-- Signs the transaction with the test wallet
-- Submits to the Solana blockchain
-- Waits for confirmation
+### 4. Payment Creation
 
-### 4. Request with Payment
-
-The client retries the request with the `X-PAYMENT` header:
+The client creates a payment proof:
 
 ```typescript
-// Header format (base64 encoded JSON):
 {
-  "x402Version": 1,
-  "scheme": "solanaTransferChecked",
-  "network": "solana-devnet",
-  "payload": {
-    "signature": "5Xz...",
-    "from": "FcxK...",
-    "amount": "100000",
-    "mint": "EPjF...",
-    "timestamp": 1699564800000
-  }
-}
-```
-
-### 5. Server Verification
-
-The server verifies the payment:
-
-1. **Decode Header**: Extract payment information
-2. **Fetch Transaction**: Get transaction from blockchain
-3. **Verify Amount**: Check payment amount matches requirement
-4. **Verify Recipient**: Ensure payment went to correct address
-5. **Verify Asset**: Confirm correct token (USDC) was used
-6. **Check Replay**: Ensure signature hasn't been used before
-7. **Mark Used**: Store signature to prevent replay attacks
-
-### 6. Protected Content
-
-If verification succeeds, the server returns the protected content:
-
-```json
-{
-  "data": "This is premium content!",
-  "timestamp": 1699564800000
-}
-```
-
-## Payment Requirements Schema
-
-### Required Fields
-
-| Field               | Type   | Description                                    |
-| ------------------- | ------ | ---------------------------------------------- |
-| `scheme`            | string | Payment scheme (e.g., "solanaTransferChecked") |
-| `network`           | string | Blockchain network (e.g., "solana-devnet")     |
-| `maxAmountRequired` | string | Maximum amount in atomic units                 |
-| `resource`          | string | URL of the protected resource                  |
-| `payTo`             | string | Recipient wallet address                       |
-| `asset`             | string | Token mint address (USDC)                      |
-
-### Optional Fields
-
-| Field               | Type   | Description                |
-| ------------------- | ------ | -------------------------- |
-| `description`       | string | Human-readable description |
-| `mimeType`          | string | Response content type      |
-| `maxTimeoutSeconds` | number | Payment timeout in seconds |
-| `outputSchema`      | object | Expected response schema   |
-
-## Token Format
-
-The `X-PAYMENT` header contains a base64-encoded JSON payload:
-
-```typescript
-interface PaymentPayload {
-  x402Version: number;
-  scheme: string;
-  network: string;
+  x402Version: 1,
+  scheme: "exact",
+  network: "solana-devnet",
   payload: {
-    signature: string; // Transaction signature
-    from: string; // Payer address
-    amount: string; // Amount in atomic units
-    mint: string; // Token mint address
-    timestamp: number; // Unix timestamp
-  };
+    signature: "5YGc9L...",  // Transaction signature
+    from: "9rKnvE...",        // Client wallet
+    amount: "10000",          // Amount in smallest units
+    mint: "4zMMC9...",        // USDC mint address
+    timestamp: 1699999999     // Current timestamp
+  }
 }
 ```
 
-## Security Features
+The payload includes:
 
-### Replay Attack Protection
+- **Signature**: Signed message proving wallet ownership
+- **From**: Client's wallet address
+- **Amount**: Exact amount being paid
+- **Mint**: Token/asset being transferred
+- **Timestamp**: Payment creation time (for replay protection)
 
-x402test tracks used transaction signatures:
+### 5. Request Retry with Payment
+
+```
+GET https://api.example.com/premium-data
+Headers: {
+  Accept: "application/json",
+  X-Payment: "eyJ4NDAyVmVyc2lvbiI6MSw..." // Base64 encoded payment
+}
+```
+
+The client retries with the `X-Payment` header containing the base64-encoded payment proof.
+
+### 6. Server Verification
+
+The server verifies:
+
+1. **Payment format** - Valid x402 payload structure
+2. **Signature** - Cryptographically valid
+3. **Amount** - Matches required amount
+4. **Network** - Correct blockchain network
+5. **Mint/Asset** - Correct token (USDC)
+6. **Timestamp** - Recent (prevents replay attacks)
+7. **Duplicate** - Not used before
+
+### 7. Success Response
+
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "data": {
+    // Your protected data here
+  },
+  "payment": {
+    "amount": "0.01",
+    "currency": "USDC",
+    "timestamp": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+The API returns the requested data along with payment confirmation.
+
+## x402 Pocket Nodes Architecture
+
+### Three-Node System
+
+```
+┌──────────────────────┐
+│  x402 Wallet Manager │
+│  - Generate wallet   │
+│  - Check balances    │
+│  - Fund instructions │
+└──────────┬───────────┘
+           │ Provides wallet data
+           ↓
+┌──────────────────────┐
+│    x402 Client       │
+│  - Makes requests    │
+│  - Handles 402       │
+│  - Creates payments  │
+│  - Signs with wallet │
+└──────────┬───────────┘
+           │ Calls API
+           ↓
+┌──────────────────────┐
+│   x402 Mock Server   │
+│  - Simulates 402     │
+│  - Verifies payment  │
+│  - Returns data      │
+└──────────────────────┘
+```
+
+### Wallet Management
+
+**Persistent Storage**:
+
+- Wallets stored in n8n's workflow static data
+- One wallet per network (devnet/mainnet)
+- Reused across all workflow executions
+
+**Multiple Options**:
+
+1. **Saved Wallet** - Connected once, then automatic
+2. **Private Key** - Manual entry, reusable
+3. **From Wallet Manager** - Live connection
+4. **Auto-Generate** - Per-node generation (not recommended)
+
+### Payment Security
+
+**Signature Verification**:
+
+```typescript
+// Message to sign
+{
+  from: "wallet_address",
+  amount: "10000",
+  mint: "usdc_mint_address",
+  timestamp: 1699999999
+}
+
+// Signed with wallet's private key
+signature = sign(message, privateKey)
+```
+
+**Replay Protection**:
+
+- Each payment has a timestamp
+- Servers track used signatures
+- Old payments automatically rejected
+
+**Amount Verification**:
+
+- Exact match required
+- Cannot underpay
+- Cannot reuse same payment for different amounts
+
+## Payment Schemes
+
+### Exact Scheme (Current)
+
+The "exact" scheme requires exact payment amounts:
 
 ```json
-// .x402test-signatures.json
-[
-  {
-    "signature": "5Xz...",
-    "usedAt": 1699564800000,
-    "endpoint": "/api/premium",
-    "amount": "100000"
-  }
-]
+{
+  "scheme": "exact",
+  "maxAmountRequired": "10000"
+}
 ```
 
-Once a signature is used, it cannot be reused:
+- Client must pay exactly 0.01 USDC
+- No partial payments
+- No overpayment credit
 
-```typescript
-// First request succeeds
-await x402("http://localhost:4402/api/data").withPayment("0.01").execute();
+### Future Schemes
 
-// Attempting to reuse the same transaction fails
-// Server returns 402 with "Payment already processed" error
-```
+The x402 protocol supports future schemes:
 
-### Amount Verification
+- **Range**: Min/max payment amounts
+- **Subscription**: Time-based access
+- **Invoice**: Pay multiple items at once
+- **Hashlock**: Conditional payments
 
-The server ensures the paid amount meets requirements:
+x402 Pocket Nodes currently implements the "exact" scheme.
 
-```typescript
-// Server requires 0.10 USDC
-const requirements = {
-  maxAmountRequired: "100000", // 0.10 USDC in atomic units
-};
+## Blockchain Settlement
 
-// Client pays 0.05 USDC - REJECTED
-await x402(url).withPayment("0.05").execute(); // Error!
+### Payment Proof vs. On-Chain Settlement
 
-// Client pays 0.10 USDC or more - ACCEPTED
-await x402(url).withPayment("0.10").execute(); // Success!
-```
+**Payment Proof (Default)**:
 
-### Recipient Verification
+- Client signs a message proving wallet ownership
+- Server verifies signature format
+- No actual blockchain transaction yet
+- Fast and efficient for testing
 
-Payments must go to the specified recipient:
+**On-Chain Settlement (Optional)**:
 
-```typescript
-// Transaction must transfer to correct address
-const verification = await verifyPayment(
-  signature,
-  expectedRecipient, // Must match payment requirement
-  expectedAmount,
-  expectedMint
-);
-```
+- Actual USDC transfer on Solana
+- Server receives real funds
+- Verifiable on blockchain explorer
+- Required for production
 
-## Atomic Units
+### When to Use Each
 
-USDC uses 6 decimal places. Amounts are specified in atomic units:
+**Use Payment Proof for**:
 
-| USDC  | Atomic Units |
-| ----- | ------------ |
-| 0.01  | 10,000       |
-| 0.10  | 100,000      |
-| 1.00  | 1,000,000    |
-| 10.00 | 10,000,000   |
+- Development and testing
+- Learning the protocol
+- Rapid iteration
+- Mock servers
 
-```typescript
-// Helper function
-const toAtomicUnits = (usdc: string): string => {
-  return (parseFloat(usdc) * 1e6).toString();
-};
+**Use On-Chain Settlement for**:
 
-toAtomicUnits("0.10"); // "100000"
-```
+- Production deployments
+- Real money transfers
+- Regulatory compliance
+- Audit trails
 
 ## Error Handling
 
-### Common Error Scenarios
+### Common Errors
 
-#### Insufficient Payment
+**Insufficient Balance**:
 
-```typescript
+```json
 {
-  "x402Version": 1,
-  "accepts": [...],
-  "error": "Payment amount 50000 is less than required 100000"
+  "error": "Insufficient balance",
+  "required": "0.01 USDC",
+  "available": "0.005 USDC"
 }
 ```
 
-#### Invalid Signature
+**Payment Too Low**:
 
-```typescript
+```json
 {
-  "error": "Transaction not found or not confirmed"
+  "error": "Amount mismatch",
+  "required": "10000",
+  "provided": "5000"
 }
 ```
 
-#### Replay Attack
+**Expired Payment**:
 
-```typescript
+```json
 {
-  "error": "Payment already processed"
+  "error": "Payment timestamp too old",
+  "maxAge": "300 seconds",
+  "age": "450 seconds"
 }
 ```
 
-#### Wrong Recipient
+**Duplicate Payment**:
 
-```typescript
+```json
 {
-  "error": "Wrong recipient: expected FcxK..., got EPjF..."
+  "error": "Payment already processed",
+  "signature": "5YGc9L..."
 }
 ```
 
-## Next Steps
+The x402 Client node handles these automatically and provides clear error messages in n8n.
 
-- [Payment Flow](/payment-flow) - Detailed payment process
-- [Testing Client](/testing-client) - Using the x402 client
-- [Mock Server](/mock-server) - Setting up the test server
-- [API Reference](/api/client) - Complete API documentation
+## Benefits of x402
+
+### For API Providers
+
+- **Micropayment revenue** - Charge per request
+- **No subscriptions** - Simpler billing
+- **Less fraud** - Crypto payments are irreversible
+- **Global access** - Anyone with a wallet can pay
+
+### For API Consumers
+
+- **Pay-as-you-go** - Only pay for what you use
+- **No accounts** - Just need a crypto wallet
+- **Transparent pricing** - See cost before making request
+- **Automated payments** - x402 Client handles everything
+
+### For n8n Users
+
+- **Workflow automation** - Integrate paid APIs easily
+- **Budget control** - Set spending limits
+- **No manual payments** - Everything automatic
+- **Testing support** - Mock server for development
+
+## What's Next?
+
+- [Payment Flow](/concepts/payment-flow/) - Detailed payment process
+- [Mock Server](/concepts/mock-server/) - Testing without real money
+- [Security](/advanced/security/) - How payments are secured
+- [Basic Payment Example](/examples/basic-payment/) - Try it yourself

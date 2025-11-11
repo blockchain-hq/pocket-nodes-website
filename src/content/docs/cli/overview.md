@@ -1,207 +1,324 @@
 ---
-title: CLI Overview
-description: Overview of the x402test command-line interface
+title: Showcase Server
+description: Deploy your own x402-enabled API server for testing
 ---
 
+The x402 Pocket Nodes package includes a **Showcase Server** - a production-ready Express.js server that demonstrates how to implement x402 payment protocol in your own APIs.
 
-x402test provides a command-line interface for managing your test environment.
+## What is the Showcase Server?
 
-## Installation
+The Showcase Server is a complete example of an x402-enabled API with:
 
-The CLI is included when you install x402test:
+- Mixed free and paid endpoints
+- Selective payment middleware
+- Standards-compliant x402 implementation
+- Production-ready code
+- Easy deployment
 
-```bash
-pnpm add -D x402test
+## Location
+
+The server is included in the package repository:
+
+```
+x402-pocket-nodes/
+└── showcase-server/
+    ├── server.js           # Main server file
+    ├── test-client.js      # Automated tests
+    ├── package.json        # Dependencies
+    ├── Dockerfile          # Container config
+    ├── docker-compose.yml  # Orchestration
+    └── docs/               # Documentation
+        ├── README.md
+        ├── QUICKSTART.md
+        ├── DEPLOYMENT.md
+        └── INTEGRATION_EXAMPLES.md
 ```
 
-## Available Commands
+## Quick Start
 
-| Command  | Description                                     |
-| -------- | ----------------------------------------------- |
-| `init`   | Initialize configuration and create test wallet |
-| `start`  | Start the mock server                           |
-| `routes` | List configured routes                          |
-
-## Basic Usage
+### Clone the Repository
 
 ```bash
-npx x402test init
-
-npx x402test start
-
-npx x402test routes
+git clone https://github.com/blockchain-hq/x402-pocket-nodes.git
+cd x402-pocket-nodes/showcase-server
 ```
 
-## Command Structure
+### Install Dependencies
 
 ```bash
-x402test <command> [options]
+npm install
 ```
 
-## Global Options
+### Configure (Optional)
 
-### Version
+Set environment variables:
 
 ```bash
-x402test --version
-x402test -v
+export WALLET_ADDRESS=your_wallet_address_here
+export SOLANA_NETWORK=solana-devnet
+export USDC_MINT=Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr
 ```
 
-### Help
+Or use defaults (demo wallet addresses).
+
+### Start the Server
 
 ```bash
-x402test --help
-
-x402test init --help
-x402test start --help
-x402test routes --help
+npm start
 ```
 
-## npx vs Local
+The server starts on `http://localhost:3000`.
 
-### Using npx (Recommended)
+### Test It
 
 ```bash
-npx x402test start
+# In another terminal
+npm test
 ```
 
-**Advantages:**
+This runs automated tests of all endpoints.
 
-- Always uses latest version
-- No global installation needed
-- Works in any project
+## API Endpoints
 
-### Local Installation
+### Free Endpoints
+
+No payment required:
+
+```
+GET  /health
+GET  /api/info
+GET  /api/public/time
+GET  /api/public/quote
+```
+
+### Paid Endpoints
+
+Require x402 payment:
+
+```
+GET  /api/premium/data      (0.01 USDC)
+GET  /api/premium/analytics (0.05 USDC)
+POST /api/premium/ai        (0.10 USDC)
+```
+
+## Using with n8n
+
+### Test with HTTP Request Node (Free)
+
+```
+[Manual Trigger]
+    ↓
+[HTTP Request]
+  - Method: GET
+  - URL: http://localhost:3000/api/public/time
+    ↓
+[Shows time without payment]
+```
+
+### Test with x402 Client (Paid)
+
+```
+[Manual Trigger]
+    ↓
+[x402 Wallet Manager]
+    ↓
+[x402 Client]
+  - URL: http://localhost:3000/api/premium/data
+  - Auto-Pay: true
+    ↓
+[Shows data after automatic payment]
+```
+
+## Deployment
+
+### Deploy to Railway
 
 ```bash
-npm install -g x402test
-
-x402test start
+npm install -g @railway/cli
+railway login
+railway init
+railway up
 ```
 
-## Configuration File
+### Deploy to Render
 
-Most commands look for `x402test.config.js` by default:
+1. Create account at render.com
+2. New Web Service → Connect repository
+3. Set environment variables
+4. Deploy!
+
+### Deploy with Docker
+
+```bash
+docker-compose up
+```
+
+## How It Works
+
+### Selective Middleware
+
+The showcase server applies x402 checking only where needed:
 
 ```javascript
-// x402test.config.js
-export default {
-  port: 4402,
-  network: "solana-devnet",
-  rpcUrl: "http://localhost:8899",
-  recipient: "YOUR_WALLET_ADDRESS",
-  routes: {
-    // ... routes
-  },
-};
+// Free endpoint - no middleware
+app.get("/api/public/time", (req, res) => {
+  res.json({ timestamp: new Date() });
+});
+
+// Paid endpoint - with middleware
+app.get(
+  "/api/premium/data",
+  requirePayment({ amount: "0.01" }), // ← x402 middleware
+  (req, res) => {
+    res.json({ data: "..." });
+  }
+);
 ```
 
-You can specify a custom config file with `--config`:
+### Payment Flow
 
-```bash
-npx x402test start --config ./custom.config.js
-```
+1. Client requests `/api/premium/data` (no payment)
+2. Server returns 402 with payment requirements
+3. Client creates payment proof
+4. Client retries with `X-Payment` header
+5. Server verifies payment
+6. Server returns protected data
 
-## Quick Reference
-
-### Initialize Project
-
-```bash
-npx x402test init
-```
-
-Creates:
-
-- `x402test.config.js` - Configuration
-- `.x402test-wallets.json` - Test wallets
-
-### Start Development Server
-
-```bash
-npx x402test start
-```
-
-Starts mock server at `http://localhost:4402`
-
-### Custom Port
-
-```bash
-npx x402test start --port 8080
-```
-
-### List Routes
-
-```bash
-npx x402test routes
-```
-
-Shows all configured payment-protected endpoints
-
-## Environment Variables
-
-You can use environment variables in your config:
+### Implementation Pattern
 
 ```javascript
-// x402test.config.js
-export default {
-  port: parseInt(process.env.PORT || "4402"),
-  rpcUrl: process.env.RPC_URL || "http://localhost:8899",
-  recipient: process.env.RECIPIENT_WALLET,
-  routes: {
-    // ... routes
-  },
-};
+function requirePayment(options) {
+  return async (req, res, next) => {
+    const paymentHeader = req.headers["x-payment"];
+
+    if (!paymentHeader) {
+      // Return 402 Payment Required
+      return res.status(402).json({
+        x402Version: 1,
+        accepts: [
+          {
+            scheme: "exact",
+            network: "solana-devnet",
+            maxAmountRequired: options.amount,
+            payTo: SERVER_WALLET_ADDRESS,
+            asset: USDC_MINT_ADDRESS,
+          },
+        ],
+      });
+    }
+
+    // Verify payment
+    const verification = verifyPayment(paymentHeader);
+
+    if (!verification.isValid) {
+      return res.status(400).json({
+        error: verification.reason,
+      });
+    }
+
+    // Payment valid - continue
+    req.payment = verification.payment;
+    next();
+  };
+}
 ```
 
-Usage:
+## Testing Your Integration
+
+Use the test client to verify behavior:
 
 ```bash
-PORT=8080 npx x402test start
+npm test
 ```
 
-## Exit Codes
+Output shows:
 
-| Code | Meaning        |
-| ---- | -------------- |
-| 0    | Success        |
-| 1    | Error occurred |
+- Free endpoints (work immediately)
+- Paid endpoints (return 402, then work with payment)
+- Error handling
+- Complete payment flow
 
-## Troubleshooting
+## Customization
 
-### Command Not Found
+### Add Your Own Endpoint
 
-```bash
-pnpm add -D x402test
-
-npx x402test --version
+```javascript
+// In server.js
+app.get(
+  "/api/custom",
+  requirePayment({
+    amount: "0.25",
+    description: "Custom API access",
+    resource: "custom-api",
+  }),
+  (req, res) => {
+    res.json({
+      yourData: "here",
+      payment: req.payment,
+    });
+  }
+);
 ```
 
-### Permission Denied
+### Change Pricing
 
-```bash
-sudo x402test start
-
-npx x402test start
+```javascript
+// Modify existing endpoint
+app.get('/api/premium/data',
+  requirePayment({ amount: '0.05' }), // Changed from 0.01
+  (req, res) => { ... }
+);
 ```
 
-### Config File Not Found
+### Add Database Tracking
 
-```bash
-npx x402test init
-
-npx x402test start --config ./my-config.js
+```javascript
+// After verification
+await database.payments.insert({
+  signature: req.payment.signature,
+  from: req.payment.from,
+  amount: req.payment.amount,
+  resource: "premium-data",
+  timestamp: new Date(),
+});
 ```
 
-### Port Already in Use
+## Documentation
 
-```bash
-npx x402test start --port 8080
+Full documentation in the showcase-server directory:
 
-lsof -ti:4402 | xargs kill
-```
+- **README.md**: Complete overview
+- **QUICKSTART.md**: Get running in 5 minutes
+- **DEPLOYMENT.md**: Deploy to production platforms
+- **INTEGRATION_EXAMPLES.md**: Client code examples (Python, JavaScript, Rust)
+- **ARCHITECTURE.md**: System design and architecture
 
-## Next Steps
+## Why Use the Showcase Server?
 
-- [init Command](/cli/init) - Initialize configuration
-- [start Command](/cli/start) - Start mock server
-- [routes Command](/cli/routes) - List routes
+### For Learning
+
+- See complete x402 implementation
+- Understand server-side verification
+- Learn middleware patterns
+- Study production-ready code
+
+### For Testing
+
+- Test your x402 Client nodes
+- Validate payment flows
+- Debug integration issues
+- Develop without external APIs
+
+### For Production
+
+- Use as starting point for your API
+- Deploy as-is for demos
+- Customize for your use case
+- Reference implementation
+
+## What's Next?
+
+- [View on GitHub](https://github.com/blockchain-hq/x402-pocket-nodes/tree/main/showcase-server)
+- [Deployment Guide](https://github.com/blockchain-hq/x402-pocket-nodes/blob/main/showcase-server/DEPLOYMENT.md)
+- [Integration Examples](https://github.com/blockchain-hq/x402-pocket-nodes/blob/main/showcase-server/INTEGRATION_EXAMPLES.md)
+- [Test with n8n](/examples/basic-payment/)

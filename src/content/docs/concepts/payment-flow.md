@@ -1,363 +1,482 @@
 ---
 title: Payment Flow
-description: Deep dive into the x402 payment flow implementation
+description: Detailed walkthrough of the x402 payment process in n8n
 ---
 
+This guide provides a detailed walkthrough of what happens when your n8n workflow makes a payment-protected API request using x402 Pocket Nodes.
 
-This guide provides a detailed walkthrough of the payment flow in x402test, from initial request to final response.
+## Complete Flow Diagram
 
-## Overview
-
-The payment flow consists of six main steps:
-
-1. Initial request without payment
-2. Server returns 402 with payment requirements
-3. Client creates and signs transaction
-4. Client submits transaction to blockchain
-5. Client retries request with payment proof
-6. Server verifies and returns protected content
-
-## Detailed Flow
-
-### Step 1: Initial Request
-
-The client makes a GET request to a payment-protected endpoint:
-
-```typescript
-const response = await fetch("http://localhost:4402/api/premium", {
-  method: "GET",
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
+```
+┌─────────────┐
+│  Workflow   │
+│  Trigger    │
+└──────┬──────┘
+       │
+       ↓
+┌──────────────────────┐
+│ x402 Wallet Manager  │
+│ - Loads wallet       │
+│ - Checks balance     │
+└──────┬───────────────┘
+       │ Wallet data (privateKey, address, balance)
+       ↓
+┌──────────────────────┐
+│   x402 Client        │
+│ 1. Initial Request   │
+└──────┬───────────────┘
+       │ GET /api/data
+       ↓
+┌──────────────────────┐
+│   API Server         │
+│ "Payment required"   │
+└──────┬───────────────┘
+       │ 402 Response
+       ↓
+┌──────────────────────┐
+│   x402 Client        │
+│ 2. Parse 402         │
+│ 3. Check limits      │
+│ 4. Create payment    │
+│ 5. Sign with wallet  │
+└──────┬───────────────┘
+       │ GET /api/data
+       │ + X-Payment header
+       ↓
+┌──────────────────────┐
+│   API Server         │
+│ 6. Verify payment    │
+│ 7. Return data       │
+└──────┬───────────────┘
+       │ 200 OK + data
+       ↓
+┌──────────────────────┐
+│   x402 Client        │
+│ 8. Return to n8n     │
+└──────┬───────────────┘
+       │ Response with payment info
+       ↓
+┌──────────────────────┐
+│  Next Node           │
+│  {{$json}}           │
+└──────────────────────┘
 ```
 
-The request does not include any payment information.
+## Step-by-Step Breakdown
 
-### Step 2: Payment Required Response
+### Step 1: Workflow Execution Starts
 
-The server responds with status code 402 and payment requirements:
+Your workflow is triggered (manually, scheduled, webhook, etc.):
 
-```typescript
-// Response status: 402
-// Response body:
+```json
+// Input from trigger
 {
-  x402Version: 1,
-  accepts: [{
-    scheme: "solanaTransferChecked",
-    network: "solana-devnet",
-    maxAmountRequired: "100000",      // 0.10 USDC
-    resource: "http://localhost:4402/api/premium",
-    description: "Premium content access",
-    mimeType: "application/json",
-    payTo: "FcxKSp7YxqYXdq...",       // Recipient wallet
-    asset: "EPjFWdd5AufqSSqeM2...",   // USDC mint
-    maxTimeoutSeconds: 30
-  }],
-  error: null
+  "triggerTime": "2024-01-15T10:30:00Z"
 }
 ```
 
-### Step 3: Parse Requirements
+### Step 2: Wallet Manager Provides Wallet
 
-The client parses the payment requirements:
-
-```typescript
-import { parse402Response } from "x402test";
-
-const requirements = parse402Response(responseBody);
-
-console.log("Amount required:", requirements.maxAmountRequired);
-console.log("Pay to:", requirements.payTo);
-console.log("Asset:", requirements.asset);
-```
-
-### Step 4: Create Payment
-
-The client creates a Solana SPL token transfer:
-
-```typescript
-import { createPayment } from "x402test";
-
-// Get test wallet
-const wallet = await getWallet();
-
-// Create and sign transaction
-const signature = await createPayment(wallet, requirements);
-
-console.log("Transaction signature:", signature);
-// Output: "5XzT4qW3..."
-```
-
-This process:
-
-1. Gets or creates token accounts for sender and recipient
-2. Creates a `transferChecked` instruction
-3. Signs the transaction with the wallet keypair
-4. Submits to the Solana blockchain
-5. Waits for confirmation
-
-### Step 5: Create Payment Header
-
-The client creates the `X-PAYMENT` header:
-
-```typescript
-import { createXPaymentHeader } from "x402test";
-
-const paymentHeader = createXPaymentHeader(
-  signature,
-  requirements,
-  wallet.publicKey.toBase58()
-);
-
-// Header value is base64-encoded JSON:
-// eyJ4NDAyVmVyc2lvbiI6MSwic2NoZW1lIjoi...
-```
-
-Header structure:
+The x402 Wallet Manager node provides wallet information:
 
 ```json
 {
-  "x402Version": 1,
-  "scheme": "solanaTransferChecked",
+  "walletAddress": "9rKnvE7PVbpq4Ws...",
+  "privateKey": "[1,2,3,...]",
   "network": "solana-devnet",
-  "payload": {
-    "signature": "5XzT4qW3...",
-    "from": "FcxKSp7YxqYX...",
-    "amount": "100000",
-    "mint": "EPjFWdd5Aufq...",
-    "timestamp": 1699564800000
+  "balances": {
+    "usdc": 10.5,
+    "sol": 1.2
+  },
+  "ready": true
+}
+```
+
+This data flows to the x402 Client node.
+
+### Step 3: Client Makes Initial Request
+
+The x402 Client sends the HTTP request without payment:
+
+```http
+GET /api/premium-data HTTP/1.1
+Host: api.example.com
+Accept: application/json
+```
+
+No `X-Payment` header yet - this is the first attempt.
+
+### Step 4: Server Returns 402 Payment Required
+
+The API server responds with payment requirements:
+
+```http
+HTTP/1.1 402 Payment Required
+Content-Type: application/json
+
+{
+  "x402Version": 1,
+  "accepts": [
+    {
+      "scheme": "exact",
+      "network": "solana-devnet",
+      "maxAmountRequired": "10000",
+      "resource": "/api/premium-data",
+      "description": "Premium data access",
+      "payTo": "ABC123xyz789...",
+      "asset": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+      "maxTimeoutSeconds": 300
+    }
+  ]
+}
+```
+
+**Payment Requirements Explained**:
+
+- `maxAmountRequired`: "10000" = 0.01 USDC (6 decimals)
+- `payTo`: Server's wallet address (recipient)
+- `asset`: USDC mint address on Solana
+- `network`: Which blockchain to use
+- `scheme`: Payment method ("exact" = exact amount)
+
+### Step 5: Client Detects 402 Response
+
+The x402 Client automatically detects the 402 status code:
+
+```typescript
+if (response.status === 402) {
+  console.log("Payment required!");
+  const requirements = response.data;
+  // Proceed to create payment
+}
+```
+
+### Step 6: Client Checks Payment Limits
+
+Before proceeding, the client verifies:
+
+```typescript
+const amountInUsdc = "0.01"; // Convert from smallest units
+const maxAllowed = "1.00"; // From node configuration
+
+if (parseFloat(amountInUsdc) > parseFloat(maxAllowed)) {
+  throw new Error("Payment exceeds limit");
+}
+```
+
+This prevents accidental overspending.
+
+### Step 7: Client Checks Balance
+
+```typescript
+if (walletBalance.usdc < 0.01) {
+  throw new Error("Insufficient USDC balance");
+}
+
+if (walletBalance.sol < 0.001) {
+  throw new Error("Insufficient SOL for fees");
+}
+```
+
+### Step 8: Client Creates Payment Proof
+
+The client creates a payment message:
+
+```typescript
+const timestamp = Math.floor(Date.now() / 1000);
+
+const message = {
+  from: "9rKnvE7PVbpq4Ws...",
+  amount: "10000",
+  mint: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+  timestamp: 1705318200,
+};
+```
+
+### Step 9: Client Signs the Message
+
+Using the wallet's private key (from Wallet Manager):
+
+```typescript
+const messageBytes = encodeMessage(message);
+const signatureBytes = sign(messageBytes, privateKey);
+const signature = base58Encode(signatureBytes);
+```
+
+This proves ownership of the wallet without revealing the private key.
+
+### Step 10: Client Creates Payment Payload
+
+```typescript
+const paymentPayload = {
+  x402Version: 1,
+  scheme: "exact",
+  network: "solana-devnet",
+  payload: {
+    signature: "5YGc9Lcqv3...",
+    from: "9rKnvE7PVbpq4Ws...",
+    amount: "10000",
+    mint: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+    timestamp: 1705318200,
+  },
+};
+```
+
+### Step 11: Client Encodes Payment Header
+
+```typescript
+const paymentJson = JSON.stringify(paymentPayload);
+const paymentHeader = base64Encode(paymentJson);
+// Result: "eyJ4NDAyVmVyc2lvbiI6MSw..."
+```
+
+### Step 12: Client Retries Request with Payment
+
+```http
+GET /api/premium-data HTTP/1.1
+Host: api.example.com
+Accept: application/json
+X-Payment: eyJ4NDAyVmVyc2lvbiI6MSw...
+```
+
+The `X-Payment` header contains the complete payment proof.
+
+### Step 13: Server Decodes Payment Header
+
+```typescript
+const paymentHeader = request.headers["x-payment"];
+const paymentJson = base64Decode(paymentHeader);
+const paymentPayload = JSON.parse(paymentJson);
+```
+
+### Step 14: Server Verifies Payment
+
+The server performs multiple checks:
+
+**1. Structure Validation**:
+
+```typescript
+if (
+  !paymentPayload.x402Version ||
+  !paymentPayload.scheme ||
+  !paymentPayload.payload
+) {
+  return error("Invalid payment format");
+}
+```
+
+**2. Amount Verification**:
+
+```typescript
+if (paymentPayload.payload.amount !== "10000") {
+  return error("Amount mismatch");
+}
+```
+
+**3. Network Verification**:
+
+```typescript
+if (paymentPayload.network !== "solana-devnet") {
+  return error("Network mismatch");
+}
+```
+
+**4. Mint/Asset Verification**:
+
+```typescript
+if (paymentPayload.payload.mint !== USDC_MINT_ADDRESS) {
+  return error("Invalid token");
+}
+```
+
+**5. Timestamp Verification** (Replay Protection):
+
+```typescript
+const now = Math.floor(Date.now() / 1000);
+const age = now - paymentPayload.payload.timestamp;
+
+if (age > 300) {
+  // 5 minutes
+  return error("Payment expired");
+}
+```
+
+**6. Duplicate Check**:
+
+```typescript
+if (usedSignatures.has(paymentPayload.payload.signature)) {
+  return error("Payment already used");
+}
+```
+
+**7. Signature Verification**:
+
+```typescript
+const message = reconstructMessage(paymentPayload.payload);
+const isValid = verifySignature(
+  message,
+  paymentPayload.payload.signature,
+  paymentPayload.payload.from
+);
+
+if (!isValid) {
+  return error("Invalid signature");
+}
+```
+
+### Step 15: Server Marks Payment as Used
+
+```typescript
+usedSignatures.add(paymentPayload.payload.signature);
+processedPayments.set(paymentPayload.payload.signature, {
+  amount: "10000",
+  from: "9rKnvE7PVbpq4Ws...",
+  timestamp: 1705318200,
+  resource: "/api/premium-data",
+});
+```
+
+### Step 16: Server Returns Success
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "data": {
+    "premium": "content",
+    "value": 123.45
+  },
+  "payment": {
+    "amount": "0.01",
+    "currency": "USDC",
+    "from": "9rKnvE7PVbpq4Ws...",
+    "timestamp": "2024-01-15T10:30:00Z"
   }
 }
 ```
 
-### Step 6: Retry with Payment
+### Step 17: Client Returns to n8n
 
-The client retries the request with the payment header:
-
-```typescript
-const response = await fetch("http://localhost:4402/api/premium", {
-  method: "GET",
-  headers: {
-    "Content-Type": "application/json",
-    "X-PAYMENT": paymentHeader,
-  },
-});
-```
-
-### Step 7: Server Verification
-
-The server verifies the payment:
-
-```typescript
-// 1. Decode X-PAYMENT header
-const payment = parse402PaymentHeader(req.headers["x-payment"]);
-
-// 2. Verify on blockchain
-const verification = await verifyPayment(
-  payment.payload.signature,
-  new PublicKey(recipientAddress),
-  BigInt(expectedAmount),
-  usdcMintAddress
-);
-
-if (!verification.isValid) {
-  return res.status(402).json({
-    error: verification.invalidReason,
-  });
-}
-
-// 3. Mark signature as used
-markSignatureUsed(payment.payload.signature, req.path, payment.payload.amount);
-
-// 4. Return protected content
-res.status(200).json({
-  data: "This is premium content!",
-  timestamp: Date.now(),
-});
-```
-
-### Step 8: Success Response
-
-If verification succeeds, the server returns the protected content:
-
-```typescript
-// Response status: 200
-// Response headers:
-{
-  "Content-Type": "application/json",
-  "X-PAYMENT-RESPONSE": "eyJzdWNjZXNzIjp0cnVlLCJ0eEhhc2giOi..."
-}
-
-// Response body:
-{
-  "data": "This is premium content!",
-  "timestamp": 1699564800000
-}
-```
-
-The `X-PAYMENT-RESPONSE` header contains:
+The x402 Client node outputs:
 
 ```json
 {
-  "success": true,
-  "error": null,
-  "txHash": "5XzT4qW3...",
-  "networkId": "solana-devnet"
+  "data": {
+    "premium": "content",
+    "value": 123.45
+  },
+  "_x402Payment": {
+    "amount": "0.01",
+    "currency": "USDC",
+    "recipient": "ABC123xyz789...",
+    "sender": "9rKnvE7PVbpq4Ws...",
+    "network": "solana-devnet",
+    "timestamp": "2024-01-15T10:30:00Z"
+  }
 }
 ```
 
-## Automated Flow with x402test
+The `_x402Payment` field contains payment details for logging/auditing.
 
-The x402test client automates this entire flow:
+### Step 18: Next Node Processes Data
 
-```typescript
-import { x402 } from "x402test";
+The next node in your workflow receives the data:
 
-// All steps happen automatically
-const response = await x402("http://localhost:4402/api/premium")
-  .withPayment({ amount: "0.10" })
-  .expectStatus(200)
-  .execute();
-
-// Response includes payment details
-console.log("Payment signature:", response.payment?.signature);
-console.log("Amount paid:", response.payment?.amount);
-console.log("From:", response.payment?.from);
-console.log("To:", response.payment?.to);
-```
-
-## Verification Process
-
-### Transaction Lookup
-
-The server fetches the transaction from Solana:
-
-```typescript
-const connection = getConnection();
-const tx = await connection.getTransaction(signature, {
-  commitment: "confirmed",
-  maxSupportedTransactionVersion: 0,
-});
-
-if (!tx) {
-  return { isValid: false, invalidReason: "Transaction not found" };
-}
-```
-
-### Amount Verification
-
-Check the transferred amount:
-
-```typescript
-const transferAmount = BigInt(transfer.amount);
-const expectedAmount = BigInt(requirements.maxAmountRequired);
-
-if (transferAmount < expectedAmount) {
-  return {
-    isValid: false,
-    invalidReason: `Insufficient amount: expected ${expectedAmount}, got ${transferAmount}`,
-  };
-}
-```
-
-### Recipient Verification
-
-Verify the recipient address:
-
-```typescript
-if (transfer.destinationOwner !== expectedRecipient.toBase58()) {
-  return {
-    isValid: false,
-    invalidReason: `Wrong recipient: expected ${expectedRecipient}, got ${transfer.destinationOwner}`,
-  };
-}
-```
-
-### Token Verification
-
-Confirm the correct token was used:
-
-```typescript
-if (transfer.mint !== expectedMint.toBase58()) {
-  return {
-    isValid: false,
-    invalidReason: `Wrong token: expected ${expectedMint}, got ${transfer.mint}`,
-  };
-}
-```
-
-### Replay Check
-
-Ensure the signature hasn't been used:
-
-```typescript
-if (isSignatureUsed(signature)) {
-  return {
-    isValid: false,
-    invalidReason: "Payment already processed",
-  };
-}
+```javascript
+// In your next node's expression
+const premiumValue = {{$json["data"]["value"]}};
+const paymentAmount = {{$json["_x402Payment"]["amount"]}};
 ```
 
 ## Error Scenarios
 
-### Insufficient Payment
+### Insufficient Balance
 
-```typescript
-// Server requires 0.10 USDC
-// Client pays 0.05 USDC
-
-const response = await x402(url).withPayment("0.05").execute();
-
-// Error: "Client max amount 50000 is less than server required amount 100000"
+```
+[Client] Check balance
+    ↓
+[Client] USDC: 0.005, Need: 0.01
+    ↓
+[Client] Throw error: "Insufficient balance"
+    ↓
+[n8n] Workflow fails with error message
 ```
 
-### Transaction Not Confirmed
+### Payment Amount Too High
 
-```typescript
-// Transaction hasn't been confirmed yet
-
-// Error: "Transaction not found or not confirmed"
+```
+[Client] Parse 402 response
+    ↓
+[Client] Required: 5.00 USDC
+    ↓
+[Client] Max configured: 1.00 USDC
+    ↓
+[Client] Throw error: "Payment exceeds limit"
 ```
 
-### Replay Attack
+### Expired Payment
 
-```typescript
-// Attempting to reuse a signature
-
-// Error: "Payment already processed"
+```
+[Client] Create payment at T=100
+    ↓
+[Network delay]
+    ↓
+[Server] Receive payment at T=400
+    ↓
+[Server] Age = 300 seconds (> 300s limit)
+    ↓
+[Server] Return error: "Payment expired"
+    ↓
+[Client] Retry with fresh payment
 ```
 
-### Network Mismatch
+### Duplicate Payment (Replay Attack)
 
-```typescript
-// Server expects devnet, transaction on mainnet
-
-// Error: "Network mismatch"
+```
+[Attacker] Intercepts payment signature
+    ↓
+[Attacker] Sends request with same signature
+    ↓
+[Server] Check usedSignatures
+    ↓
+[Server] Signature already used!
+    ↓
+[Server] Return error: "Payment already processed"
 ```
 
-## Best Practices
+## Performance Considerations
 
-### Client-Side
+### Typical Timing
 
-1. **Check Requirements**: Always parse and validate requirements before paying
-2. **Validate Amount**: Ensure you're willing to pay the required amount
-3. **Handle Errors**: Implement proper error handling for failed payments
-4. **Retry Logic**: Implement exponential backoff for transaction confirmation
-5. **Log Transactions**: Keep records of all payment transactions
+- **Parse 402**: < 1ms
+- **Create payment**: 5-10ms
+- **Sign message**: 10-20ms
+- **Encode header**: < 1ms
+- **Network roundtrip**: 100-500ms (depends on location)
+- **Server verification**: 5-15ms
 
-### Server-Side
+**Total overhead**: ~150-550ms on top of normal API request time.
 
-1. **Clear Requirements**: Provide detailed payment requirements
-2. **Verify Completely**: Don't skip any verification steps
-3. **Track Signatures**: Always check for replay attacks
-4. **Error Messages**: Return clear, actionable error messages
-5. **Timeout Handling**: Implement reasonable timeout for payment confirmation
+### Optimization Tips
 
-## Next Steps
+1. **Reuse wallets**: Don't regenerate on every request
+2. **Batch requests**: If calling same API multiple times
+3. **Cache payment proofs**: For identical requests (advanced)
+4. **Use saved wallet**: Avoid Wallet Manager connection overhead
 
-- [Testing Client](/testing-client) - Learn about the testing client
-- [Mock Server](/mock-server) - Set up the mock server
-- [API Reference](/api/verification) - Verification API details
-- [Examples](/examples/basic-payment) - See complete examples
+## Security Best Practices
+
+1. **Always set payment limits** in x402 Client configuration
+2. **Monitor wallet balances** regularly
+3. **Use Devnet for testing** before mainnet
+4. **Never share private keys** outside of n8n
+5. **Audit payment logs** in production
+6. **Rotate wallets periodically** for large volumes
+
+## What's Next?
+
+- [Mock Server](/concepts/mock-server/) - Test without real payments
+- [Testing Client](/concepts/testing-client/) - Development workflows
+- [Basic Payment Example](/examples/basic-payment/) - Try it yourself
+- [Error Handling](/examples/error-handling/) - Handle failures

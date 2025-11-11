@@ -1,210 +1,245 @@
 ---
 title: Quick Start
-description: Get started with x402test in minutes
+description: Create your first x402 payment workflow in n8n
 ---
 
+This guide will help you create your first x402 payment workflow in n8n. We'll set up a wallet, fund it with test tokens, and make a payment-protected API request.
 
-This guide will help you make your first payment-protected request with x402test.
+## Step 1: Setup Your Wallet
 
-## Setup
+### Create Wallet Setup Workflow
 
-If you haven't already, install and initialize x402test:
+1. In n8n, create a new workflow named "x402 Wallet Setup"
+2. Add a **Manual Trigger** node
+3. Add an **x402 Wallet Manager** node after the trigger
+4. Connect the nodes
 
-```bash
-pnpm add -D x402test
-npx x402test init
-```
+### Configure Wallet Manager
 
-## Start the Mock Server
+Click on the x402 Wallet Manager node and configure:
 
-Open a terminal and start the x402test server:
+- **Network**: `Devnet` (for testing)
+- **Action**: `Get Wallet Info`
 
-```bash
-npx x402test start
-```
+### Execute and Get Address
 
-Keep this running in the background. The server will listen on `http://localhost:4402`.
+1. Click **"Test Workflow"** at the top right
+2. Check the output panel on the right
+3. Copy the `walletAddress` value
 
-## Make Your First Payment Request
+Your output will look like:
 
-Create a new file `test-payment.ts`:
-
-```typescript
-import { x402 } from "x402test";
-
-async function testPayment() {
-  try {
-    // Make a request to a payment-protected endpoint
-    const response = await x402("http://localhost:4402/api/data")
-      .withPayment({ amount: "0.01" })
-      .expectStatus(200)
-      .execute();
-
-    console.log("✓ Payment successful!");
-    console.log("Response:", response.body);
-    console.log("Payment signature:", response.payment?.signature);
-  } catch (error) {
-    console.error("Payment failed:", error);
-  }
-}
-
-testPayment();
-```
-
-Run the test:
-
-```bash
-npx tsx test-payment.ts
-```
-
-## Understanding the Response
-
-A successful payment request returns:
-
-```typescript
+```json
 {
-  status: 200,
-  statusText: "OK",
-  headers: Headers,
-  body: {
-    method: "GET",
-    path: "/api/data",
-    data: { message: "Your data here" }
+  "walletAddress": "9rKnvE7PVbpq4...",
+  "network": "solana-devnet",
+  "balances": {
+    "usdc": 0,
+    "sol": 0
   },
-  payment: {
-    signature: "5Xz...", // Solana transaction signature
-    amount: "10000",    // Amount in atomic units (0.01 USDC)
-    from: "FcxK...",    // Your wallet address
-    to: "EPjF..."       // Recipient address
+  "status": "needs_funding",
+  "fundingInstructions": {
+    "steps": [
+      "Get devnet USDC from: https://spl-token-faucet.com/?token-name=USDC-Dev",
+      "Get devnet SOL: https://faucet.solana.com/",
+      "Wait for confirmation (~30 seconds)",
+      "Re-run this node to verify balance"
+    ]
   }
 }
 ```
 
-## Handle 402 Responses
+## Step 2: Fund Your Wallet
 
-When you make a request without payment, you'll receive a 402 response:
+### Get Test USDC
 
-```typescript
-const response = await fetch("http://localhost:4402/api/premium");
+1. Visit: [https://spl-token-faucet.com/?token-name=USDC-Dev](https://spl-token-faucet.com/?token-name=USDC-Dev)
+2. Paste your wallet address
+3. Click "Confirm Airdrop"
+4. Wait ~30 seconds
 
-if (response.status === 402) {
-  const requirements = await response.json();
-  console.log("Payment required:", requirements);
-  /*
-  {
-    x402Version: 1,
-    accepts: [{
-      scheme: "solanaTransferChecked",
-      network: "solana-devnet",
-      maxAmountRequired: "100000",  // 0.10 USDC
-      resource: "http://localhost:4402/api/premium",
-      description: "Premium content access",
-      payTo: "FcxKSp...",
-      asset: "EPjFWdd..."           // USDC mint address
-    }]
-  }
-  */
+### Get Test SOL (for transaction fees)
+
+1. Visit: [https://faucet.solana.com/](https://faucet.solana.com/)
+2. Paste your wallet address
+3. Click "Airdrop"
+4. Wait ~30 seconds
+
+### Verify Funding
+
+1. Go back to your n8n workflow
+2. Click **"Test Workflow"** again
+3. Check the output - you should now see:
+
+```json
+{
+  "walletAddress": "9rKnvE7PVbpq4...",
+  "network": "solana-devnet",
+  "balances": {
+    "usdc": 10,
+    "sol": 1.5
+  },
+  "status": "ready",
+  "message": "Wallet is funded and ready to use!"
 }
 ```
 
-The x402test client automatically handles this for you when you use `.withPayment()`.
+## Step 3: Test with Mock Server
 
-## Multiple Endpoints
+Now let's test making a payment using the built-in mock server.
 
-Test different pricing tiers:
+### Create Test Workflow
 
-```typescript
-// Cheap endpoint - 0.01 USDC
-const dataResponse = await x402("http://localhost:4402/api/data")
-  .withPayment("0.01")
-  .expectStatus(200)
-  .execute();
+1. Create a new workflow named "x402 Payment Test"
+2. Add these nodes in order:
+   - **Manual Trigger**
+   - **x402 Wallet Manager**
+   - **x402 Client**
 
-// Premium endpoint - 0.10 USDC
-const premiumResponse = await x402("http://localhost:4402/api/premium")
-  .withPayment("0.10")
-  .expectStatus(200)
-  .execute();
-```
+### Configure Wallet Manager
 
-## Verify Payments On-Chain
+In the x402 Wallet Manager node:
 
-Add payment verification to ensure transactions are confirmed:
+- **Network**: `Devnet`
+- **Action**: `Get Wallet Info`
 
-```typescript
-const response = await x402("http://localhost:4402/api/premium")
-  .withPayment("0.10")
-  .expectStatus(200)
-  .expectPaymentSettled() // Verifies on blockchain
-  .execute();
-```
+### Set Up Mock Server
 
-## Error Handling
+1. Create another workflow named "x402 Mock API Server"
+2. Add **x402 Mock Server** node
+3. Configure it:
 
-Handle common errors:
+   - **HTTP Method**: `POST`
+   - **Path**: `test-api`
+   - **Network**: `Devnet`
+   - **Payment Amount**: `10000` (0.01 USDC)
+   - **Description**: `Test API access`
+   - **Mock Response**: `{"status": "success", "data": "Test payment worked!"}`
+   - **Verify On-Chain**: `false` (off for testing)
 
-```typescript
-try {
-  const response = await x402("http://localhost:4402/api/premium")
-    .withPayment("0.05") // Too low!
-    .execute();
-} catch (error) {
-  if (error.message.includes("less than server required")) {
-    console.error("Payment amount too low");
+4. **Activate the workflow** (toggle at top right)
+5. Copy the webhook URL from the node
+
+### Configure Client Node
+
+In your "x402 Payment Test" workflow, click the x402 Client node:
+
+- **Wallet Source**: `From Wallet Manager Node`
+- **Resource URL**: [Paste your webhook URL from mock server]
+- **HTTP Method**: `POST`
+- **Request Body**: `{}`
+- **Auto-Pay**: `true`
+- **Max Payment Amount**: `1` (USDC)
+
+### Run Your First Payment!
+
+1. Ensure the Mock Server workflow is **Active**
+2. Go to your Test workflow
+3. Click **"Test Workflow"**
+4. Watch the execution!
+
+You should see:
+
+```json
+{
+  "status": "success",
+  "data": "Test payment worked!",
+  "_x402Payment": {
+    "amount": "0.01",
+    "currency": "USDC",
+    "recipient": "ABC123...",
+    "sender": "9rKnvE7PVbpq4...",
+    "network": "solana-devnet",
+    "timestamp": "2024-01-15T10:30:00.000Z"
   }
 }
 ```
 
-## Custom Validation
+Congratulations! You just made your first x402 payment! 🎉
 
-Add custom response validation:
+## Step 4: Understanding What Happened
 
-```typescript
-const response = await x402("http://localhost:4402/api/data")
-  .withPayment("0.01")
-  .expectStatus(200)
-  .expectBody((body) => {
-    return body.data && body.data.message;
-  })
-  .expectHeader("Content-Type", "application/json")
-  .execute();
-```
+The x402 Client node automatically:
 
-## Testing with Vitest
+1. **Sent first request** to your mock server (no payment)
+2. **Received 402** response with payment requirements
+3. **Created payment** using your wallet
+4. **Signed transaction** on Solana blockchain
+5. **Retried request** with payment proof in `X-Payment` header
+6. **Got the data** from the protected endpoint
 
-Integrate with your test suite:
+All of this happened automatically in the background!
 
-```typescript
-import { describe, it, expect } from "vitest";
-import { x402 } from "x402test";
+## Optional: Try Different Wallet Sources
 
-describe("Payment Flow", () => {
-  it("should process payment successfully", async () => {
-    const response = await x402("http://localhost:4402/api/data")
-      .withPayment("0.01")
-      .expectStatus(200)
-      .expectPaymentSettled()
-      .execute();
+The x402 Client supports multiple wallet sources:
 
-    expect(response.payment).toBeDefined();
-    expect(response.payment?.signature).toMatch(
-      /^[1-9A-HJ-NP-Za-km-z]{87,88}$/
-    );
-  });
+### Option 1: Saved Wallet (Persistent)
 
-  it("should reject insufficient payment", async () => {
-    await expect(
-      x402("http://localhost:4402/api/premium").withPayment("0.05").execute()
-    ).rejects.toThrow();
-  });
-});
-```
+After connecting Wallet Manager once, the wallet is saved:
 
-## Next Steps
+1. **Connect Wallet Manager** → Run workflow once
+2. **Disconnect Wallet Manager** (delete the connection)
+3. **Change Wallet Source** to "Saved Wallet (Recommended)"
+4. **Run again** - it uses the saved wallet!
 
-Now that you've made your first payment request:
+This is perfect for scheduled workflows.
 
-- [How x402 Works](/how-it-works) - Understand the protocol
-- [Payment Flow](/payment-flow) - Deep dive into payment process
-- [API Reference](/api/client) - Explore all client methods
-- [Examples](/examples/basic-payment) - See more examples
+### Option 2: Private Key (Reusable)
+
+Enter your private key directly (from Wallet Manager output):
+
+1. Set **Wallet Source** to "Private Key (Reusable)"
+2. Paste your **Private Key** from Wallet Manager output
+3. Select **Network** (Devnet)
+4. No connection to Wallet Manager needed!
+
+Great for workflows with triggers (schedule, webhook, etc.)
+
+## What's Next?
+
+Now that you've made your first payment:
+
+### Learn More
+
+- [Wallet Setup Guide](/concepts/wallet-setup/) - Detailed wallet management
+- [Payment Flow](/concepts/payment-flow/) - How x402 protocol works
+- [Mock Server](/concepts/mock-server/) - More about testing
+
+### Try Examples
+
+- [Basic Payment](/examples/basic-payment/) - Simple payment workflow
+- [Scheduled Payments](/examples/scheduled-payments/) - Automated payments
+- [Multiple Endpoints](/examples/multiple-endpoints/) - Call multiple APIs
+
+### Go to Production
+
+- [Using Mainnet](/advanced/mainnet/) - Deploy with real USDC
+- [Payment Limits](/advanced/payment-limits/) - Safety configuration
+- [Error Handling](/examples/error-handling/) - Handle failures gracefully
+
+## Troubleshooting
+
+### "Insufficient balance" error
+
+- Check your wallet balances in Wallet Manager
+- Fund with more USDC/SOL from the faucets
+- Wait 30 seconds after funding
+
+### "No wallet data found" error
+
+- Ensure Wallet Manager is connected to Client
+- Check that wallets are on the same network (both Devnet)
+- Try re-running Wallet Manager node
+
+### "Transaction not found" error
+
+- This is rare - retry the workflow
+- RPC nodes can be slow on devnet
+- Wait a few seconds and retry
+
+### Mock Server not responding
+
+- Ensure Mock Server workflow is **Active**
+- Check the webhook URL is correct
+- Try regenerating the webhook URL (deactivate → activate)

@@ -55,7 +55,7 @@ const timeline = [
     <div class="max-w-4xl mx-auto">
       <div class="relative">
         <!-- Timeline Line -->
-        <div class="hidden md:block absolute left-1/2 transform -translate-x-1/2 w-1 h-full" style="background: linear-gradient(to bottom, #5e17eb, #a0f0d0);"></div>
+        <div class="hidden md:block absolute left-1/2 transform -translate-x-1/2 w-1 h-full" style="background: linear-gradient(to bottom, #ff751f, #ff9f50);"></div>
 
         <!-- Timeline Items -->
         {timeline.map((item, index) => (
@@ -63,7 +63,7 @@ const timeline = [
             <div class={`md:flex ${index % 2 === 0 ? 'md:flex-row-reverse' : ''} items-center`}>
               <!-- Timeline Dot -->
               <div class="hidden md:flex absolute left-1/2 transform -translate-x-1/2 w-8 h-8 rounded-full border-4 border-gray-900 items-center justify-center z-10"
-                   style={item.status === 'completed' ? 'background-color: #5e17eb;' : 'background-color: #a0f0d0;'}>
+                   style={item.status === 'completed' ? 'background-color: #ff751f;' : 'background-color: #ff9f50;'}>
                 {item.status === 'completed' && (
                   <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -73,14 +73,14 @@ const timeline = [
 
               <!-- Content Card -->
               <div class={`md:w-1/2 ${index % 2 === 0 ? 'md:pr-12 md:text-right' : 'md:pl-12'}`}>
-                <div class="bg-gray-800 border-2 border-gray-700 rounded-xl p-6 shadow-lg hover:shadow-xl hover:shadow-green-500/10 transition">
+                <div class="bg-gray-800 border-2 border-gray-700 rounded-xl p-6 shadow-lg hover:shadow-xl hover:shadow-orange-500/10 transition">
                   <div class="flex items-center gap-2 mb-2"
                        class:list={[
                          index % 2 === 0 ? 'md:justify-end' : ''
                        ]}>
                     <span class="px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2"
                           class:list={[
-                            item.status === 'completed' ? 'bg-green-900/30' : 'bg-green-900/30'
+                            item.status === 'completed' ? 'bg-orange-900/30' : 'bg-orange-900/30'
                           ]}
                           class="text-brand">
                       {item.status === 'upcoming' ? <Rocket className="w-4 h-4" strokeWidth={1.5} /> : <Check className="w-4 h-4" strokeWidth={1.5} />}
@@ -119,7 +119,7 @@ const timeline = [
         Want to contribute or suggest features?
       </p>
       <a 
-        href="https://github.com/blockchain-hq/x402test/discussions" 
+        href="https://github.com/blockchain-hq/x402-pocket-nodes/discussions" 
         target="_blank"
         class="inline-flex items-center gap-2 px-8 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition font-medium border-2 border-gray-700"
       >

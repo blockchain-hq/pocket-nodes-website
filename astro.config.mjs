@@ -16,8 +16,8 @@ export default defineConfig({
   integrations: [
     react(),
     starlight({
-      title: "x402test",
-      description: "Testing framework for x402 payment flows on Solana",
+      title: "x402 Pocket Nodes",
+      description: "Seamlessly integrate x402 payment protocol with n8n",
       logo: {
         src: "./public/logo.png",
       },
@@ -25,7 +25,7 @@ export default defineConfig({
         {
           icon: "github",
           label: "GitHub",
-          href: "https://github.com/blockchain-hq/x402test",
+          href: "https://github.com/blockchain-hq/x402-pocket-nodes",
         },
       ],
       sidebar: [
@@ -38,12 +38,8 @@ export default defineConfig({
           autogenerate: { directory: "concepts" },
         },
         {
-          label: "API Reference",
+          label: "Node Reference",
           autogenerate: { directory: "api" },
-        },
-        {
-          label: "CLI Reference",
-          autogenerate: { directory: "cli" },
         },
         {
           label: "Examples",
@@ -52,6 +48,10 @@ export default defineConfig({
         {
           label: "Advanced",
           autogenerate: { directory: "advanced" },
+        },
+        {
+          label: "Showcase Server",
+          autogenerate: { directory: "cli" },
         },
       ],
       customCss: ["./src/styles/starlight.css"],

@@ -1,337 +1,442 @@
 ---
-title: Wallets
-description: API reference for test wallet management
+title: Wallet Manager Node
+description: Generate and manage persistent Solana wallets for x402 payments
 ---
 
+The x402 Wallet Manager node generates and manages Solana wallets for making x402 payments in your n8n workflows.
 
-API reference for managing test wallets in x402test.
+## Overview
 
-## getWallet()
+The Wallet Manager:
 
-Gets or creates a test wallet with auto-funded USDC.
+- Generates Solana keypairs
+- Checks USDC and SOL balances
+- Provides wallet data to Client nodes
+- Persists wallets across executions
+- Gives funding instructions
+- Supports both devnet and mainnet
 
-```typescript
-import { getWallet } from "x402test";
+## Node Configuration
 
-const wallet = await getWallet();
+### Network
 
-console.log("Address:", wallet.publicKey.toBase58());
-console.log("Balance:", wallet.balance, "USDC");
-console.log("Token Account:", wallet.tokenAccount.toBase58());
-```
+Select which Solana network to use:
 
-**Returns:** `Promise<TestWallet>`
+**Devnet** (For Testing)
 
-**Notes:**
+- Free test tokens
+- USDC faucet available
+- SOL faucet available
+- No real value
+- Perfect for development
 
-- Creates wallet on first call
-- Automatically funds with 10 SOL and 1000 USDC
-- Saves wallet to `.x402test-wallets.json`
-- Reuses existing wallet on subsequent calls
+**Mainnet** (For Production)
 
-## TestWallet
+- Real USDC and SOL
+- Actual money at risk
+- Use only after testing on devnet
+- Requires purchasing USDC
 
-```typescript
-interface TestWallet {
-  keypair: Keypair;
-  publicKey: PublicKey;
-  tokenAccount: PublicKey;
-  usdcMint: PublicKey;
-  balance: number;
-}
-```
+### Action
 
-**Properties:**
+Choose what the node should do:
 
-- `keypair` (Keypair): Solana keypair for signing
-- `publicKey` (PublicKey): Wallet public key
-- `tokenAccount` (PublicKey): USDC token account address
-- `usdcMint` (PublicKey): USDC mint address
-- `balance` (number): USDC balance
+**Get Wallet Info**
 
-## getUsdcMint()
+- Displays wallet address
+- Shows current balances
+- Includes private key in output
+- Shows funding instructions if needed
+- Use when setting up or connecting to Client
 
-Gets the USDC mint address.
+**Check Balance**
 
-```typescript
-import { getUsdcMint } from "x402test";
+- Shows only current balances
+- Doesn't expose private key
+- Quick balance verification
+- Use for monitoring
 
-const usdcMint = getUsdcMint();
-console.log("USDC Mint:", usdcMint.toBase58());
-```
+**Reset Wallet**
 
-**Returns:** `PublicKey`
+- Generates a new wallet
+- ⚠️ WARNING: Old wallet will be lost
+- Only use if you need to start fresh
+- Make sure to backup old wallet first
 
-**Throws:** Error if USDC mint not initialized
+## Output Data
 
-## resetWallets()
-
-Resets all wallets and creates new ones.
-
-```typescript
-import { resetWallets } from "x402test";
-
-await resetWallets();
-console.log("Wallets reset - new wallets created");
-```
-
-**Returns:** `Promise<void>`
-
-**Notes:**
-
-- Deletes `.x402test-wallets.json`
-- Next `getWallet()` call creates fresh wallets
-- Useful for testing isolation
-
-## Using Wallets
-
-### Making Payments
-
-```typescript
-import { getWallet, createPayment } from "x402test";
-
-const wallet = await getWallet();
-const signature = await createPayment(wallet, requirements);
-```
-
-### Checking Balance
-
-```typescript
-const wallet = await getWallet();
-
-if (wallet.balance < 1) {
-  console.warn("Low balance:", wallet.balance, "USDC");
-}
-```
-
-### Multiple Wallets
-
-```typescript
-import { getWallet, resetWallets } from "x402test";
-
-// Get first wallet
-const wallet1 = await getWallet();
-console.log("Wallet 1:", wallet1.publicKey.toBase58());
-
-// Reset and get new wallet
-await resetWallets();
-const wallet2 = await getWallet();
-console.log("Wallet 2:", wallet2.publicKey.toBase58());
-```
-
-## Wallet Persistence
-
-Wallets are saved to `.x402test-wallets.json`:
+### New Wallet (Needs Funding)
 
 ```json
 {
-  "wallets": [
-    {
-      "publicKey": "FcxKSp7YxqYXdq...",
-      "secretKey": [...],
-      "tokenAccounts": {
-        "USDC": "EPjFWdd5AufqSSqeM2..."
-      }
-    }
-  ],
-  "mints": {
-    "USDC": "EPjFWdd5AufqSSqeM2..."
+  "walletAddress": "9rKnvE7PVbpq4Ws...",
+  "network": "solana-devnet",
+  "balances": {
+    "usdc": 0,
+    "sol": 0
+  },
+  "status": "needs_funding",
+  "ready": false,
+  "privateKey": "[1,2,3,...]",
+  "createdAt": "2024-01-15T10:00:00.000Z",
+  "message": "New wallet generated!",
+  "fundingInstructions": {
+    "address": "9rKnvE7PVbpq4Ws...",
+    "network": "SOLANA-DEVNET",
+    "steps": [
+      "Get devnet USDC from: https://spl-token-faucet.com/?token-name=USDC-Dev",
+      "Get devnet SOL: https://faucet.solana.com/",
+      "Wait for confirmation (~30 seconds)",
+      "Re-run this node to verify balance"
+    ]
   }
 }
 ```
 
-**Security Note:** This file contains private keys. Never commit to version control!
+### Funded Wallet (Ready)
 
-Add to `.gitignore`:
-
-```
-.x402test-wallets.json
-```
-
-## Wallet Configuration
-
-Wallets are automatically configured with:
-
-- **SOL Balance**: 10 SOL (for transaction fees)
-- **USDC Balance**: 1000 USDC (for payments)
-- **Network**: Solana devnet or localnet
-- **Token Program**: SPL Token Program
-
-## Manual Wallet Usage
-
-### Creating Transactions
-
-```typescript
-import { getWallet } from "x402test";
-import { Transaction, SystemProgram } from "@solana/web3.js";
-import { getConnection } from "x402test";
-
-const wallet = await getWallet();
-const connection = getConnection();
-
-// Create custom transaction
-const transaction = new Transaction().add(
-  SystemProgram.transfer({
-    fromPubkey: wallet.publicKey,
-    toPubkey: recipient,
-    lamports: 1000000,
-  })
-);
-
-// Sign and send
-const signature = await sendAndConfirmTransaction(connection, transaction, [
-  wallet.keypair,
-]);
-```
-
-### Token Operations
-
-```typescript
-import { getWallet, getUsdcMint } from "x402test";
-import { getAccount } from "@solana/spl-token";
-import { getConnection } from "x402test";
-
-const wallet = await getWallet();
-const connection = getConnection();
-
-// Get token account info
-const tokenAccount = await getAccount(connection, wallet.tokenAccount);
-
-console.log("Balance:", tokenAccount.amount);
-console.log("Mint:", tokenAccount.mint.toBase58());
-console.log("Owner:", tokenAccount.owner.toBase58());
-```
-
-## Connection Management
-
-### getConnection()
-
-Gets the Solana connection instance.
-
-```typescript
-import { getConnection } from "x402test";
-
-const connection = getConnection();
-const balance = await connection.getBalance(wallet.publicKey);
-```
-
-**Parameters:**
-
-- `rpcUrl` (string, optional): Custom RPC URL
-
-**Returns:** `Connection`
-
-### setRpcUrl()
-
-Changes the RPC URL.
-
-```typescript
-import { setRpcUrl } from "x402test";
-
-setRpcUrl("https://api.devnet.solana.com");
-```
-
-**Parameters:**
-
-- `rpcUrl` (string): New RPC URL
-
-### getRpcUrl()
-
-Gets the current RPC URL.
-
-```typescript
-import { getRpcUrl } from "x402test";
-
-console.log("RPC URL:", getRpcUrl());
-```
-
-**Returns:** `string`
-
-## Complete Example
-
-```typescript
-import {
-  getWallet,
-  getUsdcMint,
-  createPayment,
-  verifyPayment,
-  resetWallets,
-} from "x402test";
-
-async function testWallets() {
-  // Get wallet
-  const wallet = await getWallet();
-  console.log("Address:", wallet.publicKey.toBase58());
-  console.log("Balance:", wallet.balance, "USDC");
-
-  // Get USDC mint
-  const usdcMint = getUsdcMint();
-  console.log("USDC Mint:", usdcMint.toBase58());
-
-  // Create payment
-  const signature = await createPayment(wallet, requirements);
-  console.log("Payment signature:", signature);
-
-  // Verify payment
-  const result = await verifyPayment(signature, recipient, amount, usdcMint);
-
-  console.log("Verified:", result.isValid);
-
-  // Reset for next test
-  await resetWallets();
+```json
+{
+  "walletAddress": "9rKnvE7PVbpq4Ws...",
+  "network": "solana-devnet",
+  "balances": {
+    "usdc": 10.5,
+    "sol": 1.2
+  },
+  "status": "ready",
+  "ready": true,
+  "privateKey": "[1,2,3,...]",
+  "createdAt": "2024-01-15T10:00:00.000Z",
+  "message": "Wallet is funded and ready to use!"
 }
 ```
+
+### Balance Check (No Private Key)
+
+When using "Check Balance" action:
+
+```json
+{
+  "walletAddress": "9rKnvE7PVbpq4Ws...",
+  "network": "solana-devnet",
+  "balances": {
+    "usdc": 8.3,
+    "sol": 0.95
+  },
+  "status": "ready",
+  "ready": true
+}
+```
+
+Note: Private key is NOT included for security.
+
+## Usage Patterns
+
+### First-Time Setup
+
+```
+[Manual Trigger]
+    ↓
+[x402 Wallet Manager]
+  - Network: Devnet
+  - Action: Get Wallet Info
+    ↓
+[Execute] → Copy wallet address → Fund it → Re-run
+```
+
+### In Production Workflow
+
+```
+[Schedule Trigger]
+    ↓
+[x402 Wallet Manager]
+  - Network: Devnet
+  - Action: Get Wallet Info
+    ↓
+[x402 Client] (uses wallet data from Manager)
+```
+
+### Balance Monitoring
+
+```
+[Schedule Trigger] Every 6 hours
+    ↓
+[x402 Wallet Manager]
+  - Action: Check Balance
+    ↓
+[IF] Balance < 1 USDC?
+    ↓ YES
+[Send Email] "Wallet needs funding"
+```
+
+### Multiple Networks
+
+```
+[Manual Trigger]
+    ↓
+[x402 Wallet Manager - Devnet]
+  - Network: Devnet
+    ↓
+[x402 Wallet Manager - Mainnet]
+  - Network: Mainnet
+    ↓
+[Compare Balances]
+```
+
+## Wallet Persistence
+
+### How Wallets Are Stored
+
+Wallets are stored in **n8n's workflow static data** at the global level:
+
+```typescript
+// Storage key
+`x402Wallet_${network}`;
+
+// Example keys
+("x402Wallet_solana-devnet");
+("x402Wallet_solana-mainnet");
+```
+
+### Persistence Guarantees
+
+✅ **Persists across**:
+
+- Workflow executions
+- n8n restarts
+- Workflow edits
+- Node re-configuration
+
+❌ **Does NOT persist**:
+
+- If you delete the workflow
+- If you clear workflow static data
+- If you export/import to new instance
+
+### Backup Your Wallet
+
+For important wallets with significant funds:
+
+1. Run Wallet Manager with "Get Wallet Info"
+2. Copy the `privateKey` from output
+3. Store securely (password manager, encrypted file)
+4. Never commit to git or share publicly
+
+### Multiple Wallets
+
+The Wallet Manager maintains separate wallets for:
+
+- Different networks (devnet vs mainnet)
+- Different workflows (each workflow has its own)
+
+To use the same wallet across workflows:
+
+- Use "Private Key" mode in Client nodes
+- Enter the same private key in each workflow
+
+## Funding Your Wallet
+
+### Devnet (Testing)
+
+**Get USDC**:
+
+1. Visit: https://spl-token-faucet.com/?token-name=USDC-Dev
+2. Paste your wallet address
+3. Click "Airdrop"
+4. Wait ~30 seconds
+
+**Get SOL** (for transaction fees):
+
+1. Visit: https://faucet.solana.com/
+2. Paste your wallet address
+3. Click "Airdrop"
+4. Wait ~30 seconds
+
+**Verify Funding**:
+Re-run Wallet Manager and check `balances` in output.
+
+### Mainnet (Production)
+
+**Buy USDC**:
+
+- Coinbase, Kraken, Binance, etc.
+- Withdraw to your wallet address
+- Ensure you select "Solana" network
+
+**Get SOL**:
+
+- Buy on any exchange
+- Withdraw to your wallet address
+- Need at least 0.01 SOL for fees
+
+**Double-Check**:
+
+- Verify wallet address is correct
+- Confirm network is "Solana" (not Ethereum!)
+- Small test transaction first
+
+## Security Best Practices
+
+### 1. Never Share Private Keys
+
+The private key gives full control of the wallet:
+
+- Anyone with it can spend all funds
+- Never commit to git
+- Don't share in support tickets
+- Don't paste in public channels
+
+### 2. Use Separate Wallets
+
+Don't use your main wallet for n8n:
+
+- Create dedicated wallets for each workflow
+- Only fund with amounts you plan to spend
+- Rotate periodically for high-volume use
+
+### 3. Limit Funding
+
+Only fund wallets with what you need:
+
+- Estimate monthly API costs
+- Add 20% buffer
+- Don't keep large amounts in hot wallets
+
+### 4. Monitor Balances
+
+Set up alerts:
+
+```
+[Schedule Trigger] Daily
+    ↓
+[Wallet Manager] Check Balance
+    ↓
+[IF] Balance < threshold?
+    ↓
+[Send Alert]
+```
+
+### 5. Test on Devnet First
+
+Always test workflows on devnet before mainnet:
+
+- Free tokens
+- No risk
+- Identical to mainnet behavior
+- Find bugs without losing money
 
 ## Troubleshooting
 
-### Insufficient Balance
+### Wallet keeps regenerating
 
-```typescript
-const wallet = await getWallet();
+**Problem**: Using auto-generate mode
 
-if (wallet.balance < requiredAmount) {
-  // Reset to get fresh funded wallet
-  await resetWallets();
-  const newWallet = await getWallet();
-  console.log("New balance:", newWallet.balance);
-}
+**Solution**:
+
+- Switch to "Saved Wallet" mode
+- Connect Wallet Manager once
+- Future runs use same wallet
+
+### Can't find wallet address
+
+**Problem**: Don't know where to look
+
+**Solution**:
+
+- Run Wallet Manager node
+- Check OUTPUT panel on the right
+- Look for `walletAddress` field
+- Copy the full address
+
+### Balance shows 0 after funding
+
+**Problem**: Blockchain confirmation delay
+
+**Solution**:
+
+- Wait 30-60 seconds after funding
+- Re-run Wallet Manager
+- Check on Solana Explorer:
+  - Devnet: https://explorer.solana.com/?cluster=devnet
+  - Mainnet: https://explorer.solana.com/
+
+### "Network mismatch" error
+
+**Problem**: Wallet and Client on different networks
+
+**Solution**:
+
+- Check Wallet Manager network setting
+- Check Client node network (if visible)
+- Both must be same (devnet or mainnet)
+
+### Lost access to wallet
+
+**Problem**: Workflow deleted or wallet reset
+
+**Solution**:
+
+- If you backed up private key, create new wallet with that key
+- If not backed up, wallet is lost (devnet = no problem)
+- Always backup wallets with significant funds
+
+## Private Key Formats
+
+The node accepts two formats:
+
+### JSON Array (Default)
+
+```json
+[139,45,178,234,...]
 ```
 
-### Connection Issues
+This is what Wallet Manager outputs.
 
-```typescript
-import { setRpcUrl, getConnection } from "x402test";
+### Base58 String
 
-// Try different RPC
-setRpcUrl("https://api.devnet.solana.com");
-
-const connection = getConnection();
-try {
-  await connection.getLatestBlockhash();
-  console.log("Connection OK");
-} catch (error) {
-  console.error("Connection failed:", error);
-}
+```
+5J6YvH8xK9ZwN2pQ3rT4sU5vW6xY7zA8bB9cC...
 ```
 
-### Wallet File Corruption
+Both formats work identically.
 
-```bash
-rm .x402test-wallets.json
+## Wallet Manager + Client Integration
+
+### Recommended Setup
+
+**For one-time workflows**:
+
+```
+[Manual Trigger]
+    ↓
+[Wallet Manager] Get Wallet Info
+    ↓
+[x402 Client] From Wallet Manager
 ```
 
-Then run your tests again to create fresh wallets.
+**For scheduled workflows**:
 
-## Best Practices
+```
+First run:
+[Manual] → [Wallet Manager] → [x402 Client]
 
-1. **Add to .gitignore**: Never commit wallet files
-2. **Reset Between Tests**: Use `resetWallets()` for test isolation
-3. **Check Balances**: Verify sufficient funds before payments
-4. **Use Local Validator**: Faster and more reliable than devnet
-5. **Clean Up**: Delete wallet files after testing
+After first run (wallet is saved):
+[Schedule] → [x402 Client] (Saved Wallet mode)
+```
 
-## Next Steps
+**For webhook workflows**:
 
-- [Payment Methods](/api/payment) - Creating payments
-- [Verification](/api/verification) - Verifying payments
-- [Examples](/examples/basic-payment) - Complete examples
+```
+[Webhook Trigger]
+    ↓
+[x402 Client]
+  - Wallet Source: Private Key
+  - Private Key: [pasted once]
+```
+
+## What's Next?
+
+- [x402 Client](/concepts/testing-client/) - Make payment requests
+- [Mock Server](/concepts/mock-server/) - Test without real payments
+- [Basic Payment Example](/examples/basic-payment/) - Your first payment
+- [Security](/advanced/configuration/) - Advanced security settings

@@ -1,322 +1,486 @@
 ---
 title: Replay Protection
-description: Understanding and implementing replay attack protection
+description: How x402 prevents payment replay attacks
 ---
 
+Learn how x402 Pocket Nodes protects against replay attacks where attackers try to reuse payment proofs to gain unauthorized access.
 
-x402test includes built-in protection against replay attacks.
+## What is a Replay Attack?
 
-## What Are Replay Attacks?
+A replay attack occurs when an attacker:
 
-A replay attack occurs when an attacker intercepts a valid payment signature and attempts to reuse it to access the same resource multiple times without paying again.
+1. Intercepts a valid payment proof
+2. Captures the `X-Payment` header
+3. Attempts to reuse it for another request
+4. Tries to get free access using someone else's payment
 
-## How x402test Prevents Replay Attacks
+Without protection, this would allow:
 
-### Signature Tracking
+- Unlimited API access with one payment
+- Stolen payment proofs giving free access
+- Compromised security of payment system
 
-Every used transaction signature is recorded:
+## How x402 Prevents Replay Attacks
+
+### 1. Timestamp Validation
+
+Every payment includes a timestamp:
 
 ```json
-// .x402test-signatures.json
-[
-  {
-    "signature": "5XzT4qW3...",
-    "usedAt": 1699564800000,
-    "endpoint": "/api/premium",
-    "amount": "100000"
+{
+  "payload": {
+    "timestamp": 1705318200
   }
-]
-```
-
-### Verification Process
-
-When a payment is received:
-
-1. **Check Signature**: Look up signature in used signatures
-2. **If Found**: Reject with "Payment already processed"
-3. **If New**: Verify transaction on blockchain
-4. **If Valid**: Mark signature as used and return content
-
-## API Functions
-
-### isSignatureUsed()
-
-Check if a signature has been used.
-
-```typescript
-import { isSignatureUsed } from "x402test";
-
-if (isSignatureUsed(signature)) {
-  console.log("Signature already used");
 }
 ```
 
-### markSignatureUsed()
-
-Mark a signature as used.
+**Server checks**:
 
 ```typescript
-import { markSignatureUsed } from "x402test";
+const now = Math.floor(Date.now() / 1000);
+const age = now - payment.timestamp;
 
-markSignatureUsed(signature, "/api/endpoint", "10000");
-```
-
-### getSignatureInfo()
-
-Get information about a used signature.
-
-```typescript
-import { getSignatureInfo } from "x402test";
-
-const info = getSignatureInfo(signature);
-if (info) {
-  console.log("Used at:", new Date(info.usedAt));
-  console.log("Endpoint:", info.endpoint);
-  console.log("Amount:", info.amount);
+if (age > 300) {
+  // 5 minutes
+  reject("Payment expired");
 }
 ```
 
-### getSignatureStats()
+**Protection**:
 
-Get statistics about all signatures.
+- Old payments automatically rejected
+- Attack window limited to 5 minutes
+- Reduces replay attack viability
+
+### 2. Signature Tracking
+
+Servers track used payment signatures:
 
 ```typescript
-import { getSignatureStats } from "x402test";
+// In-memory set (or database in production)
+const usedSignatures = new Set();
 
-const stats = getSignatureStats();
-console.log("Total signatures:", stats.total);
-console.log("All signatures:", stats.signatures);
+// On payment verification
+if (usedSignatures.has(payment.signature)) {
+  reject("Payment already used");
+}
+
+// After successful verification
+usedSignatures.add(payment.signature);
 ```
 
-### resetSignatures()
+**Protection**:
 
-Clear all signature records (for testing).
+- Each signature can only be used once
+- Even within the 5-minute window
+- Duplicate attempts are rejected
 
-```typescript
-import { resetSignatures } from "x402test";
+### 3. Combined Protection
 
-resetSignatures();
-console.log("All signatures cleared");
+Both mechanisms work together:
+
+```
+Payment created at T=0
+    ↓
+Used at T=60 (1 minute) ✓
+    ↓
+Signature marked as used
+    ↓
+Attempt to reuse at T=120 (2 minutes)
+    ├─ Timestamp check: ✓ (< 5 min)
+    └─ Signature check: ✗ (already used)
+         ↓
+    Rejected!
 ```
 
-## Example: Replay Attack Prevention
+## Implementation in Nodes
+
+### Client Node
+
+The x402 Client automatically:
+
+- Generates fresh timestamp for each payment
+- Creates unique signature for each payment
+- Never reuses payment proofs
+
+**Every request gets a new payment**:
+
+```
+Request 1 → Payment A (timestamp: T1, signature: S1)
+Request 2 → Payment B (timestamp: T2, signature: S2)
+Request 3 → Payment C (timestamp: T3, signature: S3)
+```
+
+### Mock Server Node
+
+The x402 Mock Server automatically:
+
+- Checks payment timestamps
+- Tracks used signatures
+- Rejects duplicates
+
+**Storage**: Node-level static data
 
 ```typescript
-import { x402 } from "x402test";
+const staticData = this.getWorkflowStaticData("node");
+const usedSignatures = staticData.usedSignatures || new Set();
+```
 
-async function demonstrateReplayProtection() {
-  // First request - succeeds
-  const response1 = await x402("http://localhost:4402/api/data")
-    .withPayment("0.01")
-    .execute();
+## Attack Scenarios
 
-  console.log("First request succeeded");
-  console.log("Signature:", response1.payment?.signature);
+### Scenario 1: Immediate Replay
 
-  // Try to reuse the same payment
-  try {
-    // Manually construct request with same payment
-    const { createXPaymentHeader, parse402Response } = await import("x402test");
+**Attack**:
 
-    const initialResponse = await fetch("http://localhost:4402/api/data");
-    const requirements = parse402Response(await initialResponse.json());
+```
+1. Attacker captures X-Payment header
+2. Immediately reuses it
+```
 
-    const paymentHeader = createXPaymentHeader(
-      response1.payment!.signature,
-      requirements,
-      response1.payment!.from
-    );
+**Defense**:
 
-    const replayResponse = await fetch("http://localhost:4402/api/data", {
-      headers: { "X-PAYMENT": paymentHeader },
-    });
+```
+Server checks usedSignatures
+→ Signature already used
+→ Reject: "Payment already processed"
+```
 
-    if (replayResponse.status === 402) {
-      const body = await replayResponse.json();
-      console.log("✔ Replay attack prevented!");
-      console.log("  Error:", body.error);
+**Result**: ✅ Blocked
+
+### Scenario 2: Delayed Replay
+
+**Attack**:
+
+```
+1. Attacker captures X-Payment header at T=0
+2. Waits 10 minutes
+3. Tries to use it at T=600
+```
+
+**Defense**:
+
+```
+Server checks timestamp
+→ Age: 600 seconds (> 300 max)
+→ Reject: "Payment expired"
+```
+
+**Result**: ✅ Blocked
+
+### Scenario 3: Modified Replay
+
+**Attack**:
+
+```
+1. Attacker captures X-Payment header
+2. Modifies amount or recipient
+3. Reuses with modifications
+```
+
+**Defense**:
+
+```
+Server verifies signature
+→ Message doesn't match signature
+→ Signature invalid for modified data
+→ Reject: "Invalid signature"
+```
+
+**Result**: ✅ Blocked (signature wouldn't verify)
+
+### Scenario 4: Cross-Endpoint Replay
+
+**Attack**:
+
+```
+1. Attacker pays for /api/cheap (0.01 USDC)
+2. Captures payment
+3. Tries to use for /api/expensive (1.00 USDC)
+```
+
+**Defense**:
+
+```
+Server checks amount in signature
+→ Amount: 0.01 USDC
+→ Required: 1.00 USDC
+→ Reject: "Amount mismatch"
+```
+
+**Result**: ✅ Blocked
+
+## Production Considerations
+
+### Signature Storage
+
+**In-Memory (Development)**:
+
+```typescript
+const usedSignatures = new Set();
+```
+
+**Pros**:
+
+- Fast
+- Simple
+
+**Cons**:
+
+- Lost on restart
+- Doesn't scale across instances
+
+**Redis (Production)**:
+
+```typescript
+// Pseudocode
+const redis = new Redis();
+
+async function isSignatureUsed(sig) {
+  return await redis.exists(`sig:${sig}`);
+}
+
+async function markSignatureUsed(sig) {
+  // Expire after 5 minutes (payment timeout)
+  await redis.setex(`sig:${sig}`, 300, "1");
+}
+```
+
+**Pros**:
+
+- Persists across restarts
+- Shared across instances
+- Automatic expiry
+
+**Cons**:
+
+- Requires Redis
+- Network overhead
+
+**Database (Audit Trail)**:
+
+```typescript
+await db.payments.insert({
+  signature: payment.signature,
+  from: payment.from,
+  amount: payment.amount,
+  timestamp: payment.timestamp,
+  resource: request.path,
+  usedAt: new Date(),
+});
+```
+
+**Pros**:
+
+- Permanent audit trail
+- Full payment history
+- Analytics possible
+
+**Cons**:
+
+- Slower than Redis
+- Storage grows over time
+
+### Cleanup Strategies
+
+**Time-Based Cleanup**:
+
+```javascript
+// Remove signatures older than 5 minutes
+setInterval(() => {
+  const now = Date.now() / 1000;
+  for (const [sig, data] of processedPayments) {
+    if (now - data.timestamp > 300) {
+      processedPayments.delete(sig);
     }
-  } catch (error) {
-    console.error("Error:", error);
   }
+}, 60000); // Every minute
+```
+
+**Size-Based Cleanup**:
+
+```javascript
+// Keep only last N signatures
+const MAX_SIGNATURES = 10000;
+
+if (usedSignatures.size > MAX_SIGNATURES) {
+  // Remove oldest signatures (requires ordered storage)
+  const sorted = [...usedSignatures].sort();
+  const toRemove = sorted.slice(0, 1000);
+  toRemove.forEach((sig) => usedSignatures.delete(sig));
 }
 ```
 
-## Custom Implementation
+## Multi-Instance Deployment
 
-### Server-Side
+### Challenge
+
+When running multiple server instances:
+
+```
+Instance A knows about payments it processed
+Instance B doesn't know about Instance A's payments
+→ Duplicate payment could work on Instance B
+```
+
+### Solution: Shared Storage
+
+Use Redis or database for signature tracking:
+
+```
+Client → Load Balancer
+             ├→ Instance A → Redis (check/store signatures)
+             ├→ Instance B → Redis (check/store signatures)
+             └→ Instance C → Redis (check/store signatures)
+```
+
+All instances check the same signature store.
+
+## Mock Server Replay Protection
+
+### How It Works
+
+The x402 Mock Server uses node-level static data:
 
 ```typescript
-import { verifyPayment, isSignatureUsed, markSignatureUsed } from "x402test";
+const staticData = this.getWorkflowStaticData("node");
 
-async function handlePayment(signature: string, endpoint: string) {
-  // Check replay
-  if (isSignatureUsed(signature)) {
-    return {
-      status: 402,
-      error: "Payment already processed",
-    };
-  }
-
-  // Verify on blockchain
-  const result = await verifyPayment(signature, recipient, amount, mint);
-
-  if (!result.isValid) {
-    return {
-      status: 402,
-      error: result.invalidReason,
-    };
-  }
-
-  // Mark as used
-  markSignatureUsed(signature, endpoint, amount.toString());
-
-  return {
-    status: 200,
-    data: "Protected content",
-  };
-}
-```
-
-### Client-Side
-
-The x402 client automatically creates new payments for each request:
-
-```typescript
-// Each request creates a NEW payment
-await x402(url).withPayment("0.01").execute(); // Payment 1
-await x402(url).withPayment("0.01").execute(); // Payment 2 (different signature)
-```
-
-## Signature Storage
-
-### File Storage
-
-Signatures are stored in `.x402test-signatures.json`:
-
-```json
-[
-  {
-    "signature": "5XzT4qW3Hk2p7vN...",
-    "usedAt": 1699564800000,
-    "endpoint": "/api/premium",
-    "amount": "100000"
-  },
-  {
-    "signature": "3AbC8dEf9Gh1Jk2...",
-    "usedAt": 1699564900000,
-    "endpoint": "/api/data",
-    "amount": "10000"
-  }
-]
-```
-
-**Important:** Add to `.gitignore`:
-
-```
-.x402test-signatures.json
-```
-
-### In-Memory Storage
-
-For production, consider using a database:
-
-```typescript
-class SignatureStore {
-  private signatures = new Map<string, SignatureRecord>();
-
-  isUsed(signature: string): boolean {
-    return this.signatures.has(signature);
-  }
-
-  markUsed(signature: string, endpoint: string, amount: string) {
-    this.signatures.set(signature, {
-      signature,
-      usedAt: Date.now(),
-      endpoint,
-      amount,
-    });
-  }
-
-  getInfo(signature: string): SignatureRecord | undefined {
-    return this.signatures.get(signature);
-  }
-}
-```
-
-### Database Storage
-
-```typescript
-import { prisma } from "./db";
-
-async function isSignatureUsed(signature: string): Promise<boolean> {
-  const record = await prisma.usedSignature.findUnique({
-    where: { signature },
-  });
-  return record !== null;
+// Track signatures
+if (!staticData.usedSignatures) {
+  staticData.usedSignatures = {};
 }
 
-async function markSignatureUsed(
-  signature: string,
-  endpoint: string,
-  amount: string
-) {
-  await prisma.usedSignature.create({
-    data: {
-      signature,
-      endpoint,
-      amount,
-      usedAt: new Date(),
-    },
-  });
+const signatureKey = `${signature}-${timestamp}`;
+
+if (staticData.usedSignatures[signatureKey]) {
+  reject("Payment already processed");
 }
+
+staticData.usedSignatures[signatureKey] = {
+  usedAt: new Date().toISOString(),
+  from: payment.from,
+  amount: payment.amount,
+};
 ```
 
-## Security Considerations
+### Persistence
 
-### Signature Expiration
+Signatures persist across:
 
-Implement time-based expiration:
+- ✅ Workflow executions
+- ✅ n8n restarts
+- ✅ Workflow edits
 
-```typescript
-function isSignatureExpired(
-  usedAt: number,
-  maxAge: number = 86400000
-): boolean {
-  return Date.now() - usedAt > maxAge; // Default: 24 hours
-}
+Lost on:
 
-// Clean up old signatures
-function cleanupExpiredSignatures() {
-  const stats = getSignatureStats();
-  const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+- ❌ Workflow deletion
+- ❌ Manual static data clear
 
-  const validSignatures = stats.signatures.filter(
-    (sig) => !isSignatureExpired(sig.usedAt, maxAge)
-  );
+### Testing Replay Attacks
 
-  // Save only valid signatures
-  // Implementation depends on storage method
-}
+Try to reuse a payment:
+
 ```
-
-### Distributed Systems
-
-For multiple servers, use shared storage:
-
-1. **Redis**: Fast, distributed cache
-2. **Database**: Persistent storage
-3. **Message Queue**: Synchronize across servers
+1. Make successful payment
+2. Copy X-Payment header value
+3. Make manual HTTP request with same header
+4. Should get: "Payment already processed"
+```
 
 ## Best Practices
 
-1. **Always Check**: Never skip replay protection
-2. **Use Timestamps**: Track when signatures were used
-3. **Cleanup Old**: Remove expired signatures
-4. **Log Attempts**: Log replay attack attempts
-5. **Secure Storage**: Protect signature database
+### 1. Always Track Signatures
 
-## Next Steps
+Even for testing:
 
-- [Custom Validation](/advanced/custom-validation) - Advanced validation
-- [Verification](/api/verification) - Payment verification API
+- Builds good habits
+- Reveals replay vulnerabilities
+- Tests real-world scenarios
+
+### 2. Use Appropriate TTL
+
+**5 minutes** is good because:
+
+- Enough time for network delays
+- Short enough to limit replay window
+- Standard in x402 protocol
+
+### 3. Log Replay Attempts
+
+When duplicate detected:
+
+```javascript
+console.warn("Replay attack detected:", {
+  signature: payment.signature,
+  originalTimestamp: storedData.timestamp,
+  attemptTimestamp: payment.timestamp,
+  from: payment.from,
+});
+
+// Alert security team if threshold exceeded
+```
+
+### 4. Monitor for Patterns
+
+Watch for:
+
+- Multiple replay attempts from same wallet
+- Systematic replay testing
+- Coordinated attacks
+
+### 5. Include in Tests
+
+Test replay protection:
+
+```javascript
+// First request - should succeed
+const response1 = await client.makePayment();
+
+// Second request with same payment - should fail
+const response2 = await client.reusePayment();
+expect(response2.error).toContain("already processed");
+```
+
+## Troubleshooting
+
+### False Positives
+
+**Problem**: Legitimate request rejected as duplicate
+
+**Causes**:
+
+- Client retry with same payment
+- Network issue caused duplicate send
+- Timestamp collision (very rare)
+
+**Solutions**:
+
+- Client creates new payment on retry
+- Use signature + timestamp as key
+- Log all rejections for analysis
+
+### Signature Storage Growing
+
+**Problem**: usedSignatures keeps growing
+
+**Solutions**:
+
+- Implement time-based cleanup
+- Use Redis with TTL
+- Store only recent signatures (last hour)
+
+### Cross-Instance Issues
+
+**Problem**: Duplicate works on different instance
+
+**Solution**:
+
+- Use shared storage (Redis/Database)
+- All instances check same signature store
+- Synchronize via distributed cache
+
+## What's Next?
+
+- [Custom Validation](/advanced/custom-validation/) - Add custom checks
+- [Configuration](/advanced/configuration/) - Advanced setup
+- [Mock Server](/concepts/mock-server/) - Test replay protection
+- [Security](https://github.com/blockchain-hq/x402-pocket-nodes/tree/main/showcase-server) - Showcase server implementation

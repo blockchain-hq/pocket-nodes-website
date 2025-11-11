@@ -1,401 +1,439 @@
 ---
-title: x402() Client
-description: Complete API reference for the x402test client
+title: Client Node Reference
+description: Complete reference for the x402 Client node
 ---
 
+Complete configuration reference for the x402 Client node in n8n.
 
-Complete API reference for the x402test HTTP client.
+## Node Properties
 
-## Import
+### Wallet Source
 
-```typescript
-import { x402, request, X402Request } from "x402test";
+| Value        | Description                | Use Case                               |
+| ------------ | -------------------------- | -------------------------------------- |
+| `saved`      | Saved Wallet (Recommended) | Workflows with persistent wallet needs |
+| `privateKey` | Private Key (Reusable)     | Trigger-based workflows                |
+| `external`   | From Wallet Manager Node   | Dynamic wallet management              |
+| `auto`       | Auto-Generate Per Node     | Quick testing only                     |
+
+**Default**: `saved`
+
+### Network (for Auto-Generate mode)
+
+| Value            | Description                 |
+| ---------------- | --------------------------- |
+| `solana-devnet`  | Solana Devnet (testing)     |
+| `solana-mainnet` | Solana Mainnet (production) |
+
+**Default**: `solana-devnet`
+
+### Resource URL
+
+**Type**: String (required)
+
+The full URL of the x402-enabled API endpoint.
+
+**Examples**:
+
+```
+https://api.example.com/premium-data
+http://localhost:3000/webhook/test-api
+https://your-n8n.com/webhook/9bb44e4d-9e52-442b-a4fb-53ea7029ef1c/n
 ```
 
-## Constructor
+### HTTP Method
 
-### x402(url: string)
+| Value    | Description     |
+| -------- | --------------- |
+| `GET`    | Retrieve data   |
+| `POST`   | Send data       |
+| `PUT`    | Update resource |
+| `DELETE` | Remove resource |
 
-Creates a new x402 request instance.
+**Default**: `POST`
 
-```typescript
-const req = x402("http://localhost:4402/api/data");
-```
+### Request Body
 
-**Parameters:**
+**Type**: JSON string
 
-- `url` (string): The URL to make the request to
+**Default**: `{}`
 
-**Returns:** `X402Request` instance
+**Only shown for**: POST and PUT requests
 
-**Aliases:** `request(url)`
+The request body to send to the API.
 
-## HTTP Methods
+**Static example**:
 
-### get()
-
-Sets the HTTP method to GET.
-
-```typescript
-x402(url).get().execute();
-```
-
-**Returns:** `this` (chainable)
-
-### post(body?: unknown)
-
-Sets the HTTP method to POST with optional body.
-
-```typescript
-x402(url).post({ key: "value" }).execute();
-```
-
-**Parameters:**
-
-- `body` (unknown, optional): Request body
-
-**Returns:** `this` (chainable)
-
-### put(body?: unknown)
-
-Sets the HTTP method to PUT with optional body.
-
-```typescript
-x402(url).put({ key: "updated" }).execute();
-```
-
-**Parameters:**
-
-- `body` (unknown, optional): Request body
-
-**Returns:** `this` (chainable)
-
-### delete()
-
-Sets the HTTP method to DELETE.
-
-```typescript
-x402(url).delete().execute();
-```
-
-**Returns:** `this` (chainable)
-
-## Headers
-
-### header(name: string, value: string)
-
-Sets a single request header.
-
-```typescript
-x402(url).header("Content-Type", "application/json").execute();
-```
-
-**Parameters:**
-
-- `name` (string): Header name
-- `value` (string): Header value
-
-**Returns:** `this` (chainable)
-
-### headers(headers: Record<string, string>)
-
-Sets multiple request headers.
-
-```typescript
-x402(url)
-  .headers({
-    "Content-Type": "application/json",
-    Authorization: "Bearer token",
-  })
-  .execute();
-```
-
-**Parameters:**
-
-- `headers` (Record<string, string>): Object of header key-value pairs
-
-**Returns:** `this` (chainable)
-
-## Body
-
-### body(body: unknown)
-
-Sets the request body.
-
-```typescript
-x402(url).body({ key: "value" }).execute();
-```
-
-**Parameters:**
-
-- `body` (unknown): Request body (will be JSON stringified)
-
-**Returns:** `this` (chainable)
-
-## Payment
-
-### withPayment(config: string | { amount: string })
-
-Specifies the maximum amount willing to pay.
-
-```typescript
-// String amount
-x402(url).withPayment("0.01").execute();
-
-// Object with amount
-x402(url).withPayment({ amount: "0.01" }).execute();
-```
-
-**Parameters:**
-
-- `config` (string | object): Payment amount in USDC
-
-**Returns:** `this` (chainable)
-
-**Notes:**
-
-- Amount should be in USDC (e.g., "0.01" for 1 cent)
-- Client will automatically convert to atomic units
-- Must be >= server's required amount
-
-## Expectations
-
-### expectStatus(status: number)
-
-Asserts the response status code.
-
-```typescript
-await x402(url).withPayment("0.01").expectStatus(200).execute();
-```
-
-**Parameters:**
-
-- `status` (number): Expected HTTP status code
-
-**Returns:** `this` (chainable)
-
-**Throws:** `AssertionError` if status doesn't match
-
-### expectPaymentSettled()
-
-Verifies the payment transaction is confirmed on-chain.
-
-```typescript
-await x402(url).withPayment("0.01").expectPaymentSettled().execute();
-```
-
-**Returns:** `this` (chainable)
-
-**Throws:** `PaymentVerificationError` if payment verification fails
-
-### expectPaymentAmount(amount: string)
-
-Verifies the exact payment amount in atomic units.
-
-```typescript
-await x402(url)
-  .withPayment("0.01")
-  .expectPaymentAmount("10000") // 0.01 USDC in atomic units
-  .execute();
-```
-
-**Parameters:**
-
-- `amount` (string): Expected amount in atomic units
-
-**Returns:** `this` (chainable)
-
-**Throws:** `AssertionError` if amount doesn't match
-
-### expectBody(matcher: unknown | ((body: any) => boolean))
-
-Validates the response body.
-
-```typescript
-// Exact match
-await x402(url).expectBody({ key: "value" }).execute();
-
-// Custom validation function
-await x402(url)
-  .expectBody((body) => body.data && body.data.length > 0)
-  .execute();
-```
-
-**Parameters:**
-
-- `matcher` (unknown | function): Expected body or validation function
-
-**Returns:** `this` (chainable)
-
-**Throws:** `AssertionError` if validation fails
-
-### expectHeader(name: string, value: string | RegExp)
-
-Validates a response header.
-
-```typescript
-// Exact match
-await x402(url).expectHeader("Content-Type", "application/json").execute();
-
-// Regex match
-await x402(url)
-  .expectHeader("Content-Type", /application\/json/)
-  .execute();
-```
-
-**Parameters:**
-
-- `name` (string): Header name
-- `value` (string | RegExp): Expected value or pattern
-
-**Returns:** `this` (chainable)
-
-**Throws:** `AssertionError` if header doesn't match
-
-## Execution
-
-### execute<T>()
-
-Executes the request and returns the response.
-
-```typescript
-const response = await x402(url)
-  .withPayment("0.01")
-  .expectStatus(200)
-  .execute();
-```
-
-**Returns:** `Promise<X402Response<T>>`
-
-**Throws:**
-
-- `X402Error` - General request errors
-- `X402ParseError` - Failed to parse 402 response
-- `PaymentCreationError` - Failed to create payment
-- `PaymentVerificationError` - Payment verification failed
-- `AssertionError` - Expectation not met
-
-## Response Type
-
-### X402Response<T>
-
-The response object returned by `execute()`.
-
-```typescript
-interface X402Response<T> {
-  status: number;
-  statusText: string;
-  headers: Headers;
-  body: T;
-  payment?: {
-    signature: string;
-    amount: string;
-    from: string;
-    to: string;
-  };
+```json
+{
+  "query": "search term",
+  "limit": 10
 }
 ```
 
-**Properties:**
+**Dynamic example**:
 
-- `status` (number): HTTP status code
-- `statusText` (string): HTTP status text
-- `headers` (Headers): Response headers
-- `body` (T): Parsed response body
-- `payment` (object, optional): Payment details if payment was made
-
-## Complete Example
-
-```typescript
-import { x402 } from "x402test";
-
-try {
-  const response = await x402("http://localhost:4402/api/premium")
-    .post({ userId: "123" })
-    .header("X-Custom", "value")
-    .withPayment("0.10")
-    .expectStatus(200)
-    .expectPaymentSettled()
-    .expectHeader("Content-Type", "application/json")
-    .expectBody((body) => body.success === true)
-    .execute();
-
-  console.log("Status:", response.status);
-  console.log("Body:", response.body);
-  console.log("Payment:", response.payment);
-} catch (error) {
-  console.error("Error:", error.message);
+```json
+{
+  "userId": "{{$json.userId}}",
+  "timestamp": "{{new Date().toISOString()}}",
+  "data": "{{$json.inputData}}"
 }
 ```
 
-## Chaining
+### Headers
 
-All methods except `execute()` return the request instance, allowing method chaining:
+**Type**: Collection
 
-```typescript
-await x402(url)
-  .post({ data: "value" })
-  .header("Content-Type", "application/json")
-  .headers({ "X-Custom": "header" })
-  .body({ additional: "data" })
-  .withPayment("0.01")
-  .expectStatus(200)
-  .expectPaymentSettled()
-  .expectBody({ success: true })
-  .execute();
+Custom HTTP headers to include in the request.
+
+**Structure**:
+
+```
+Name: Header name (e.g., "X-API-Key")
+Value: Header value (e.g., "abc123" or "{{$json.apiKey}}")
 ```
 
-## Error Handling
+**Common headers**:
 
-### Using try-catch
+- `Authorization`: `Bearer {{$json.token}}`
+- `X-API-Key`: `{{$json.apiKey}}`
+- `Content-Type`: `application/json`
+- `User-Agent`: `n8n-x402-client/1.0`
 
-```typescript
-import { X402Error, AssertionError } from "x402test";
+### Auto-Pay
 
-try {
-  await x402(url).withPayment("0.01").execute();
-} catch (error) {
-  if (error instanceof X402Error) {
-    console.error("Payment error:", error.message);
-  } else if (error instanceof AssertionError) {
-    console.error("Assertion failed:", error.message);
+**Type**: Boolean
+
+**Default**: `true`
+
+When enabled:
+
+- Automatically handles 402 responses
+- Creates and signs payments
+- Retries with payment proof
+- Returns protected data
+
+When disabled:
+
+- Throws error on 402 response
+- Useful for manual payment handling
+
+### Max Payment Amount (USDC)
+
+**Type**: Number
+
+**Default**: `1`
+
+**Only shown when**: Auto-Pay is enabled
+
+Maximum USDC amount willing to pay per request. Acts as a safety limit.
+
+**Recommended values**:
+
+- Development: `0.10`
+- Production: `1.00`
+- High-value APIs: `5.00`
+- Mission-critical: `10.00`
+
+### Protocol Format
+
+**Type**: Options
+
+**Default**: `official`
+
+**Only shown when**: Auto-Pay is enabled
+
+| Value      | Description             | Use Case               |
+| ---------- | ----------------------- | ---------------------- |
+| `official` | Official X-402 Protocol | Standard x402 servers  |
+| `legacy`   | Signed Transaction      | Custom implementations |
+
+**Official X-402 Protocol**:
+
+- Signature-based payment proof
+- No blockchain transaction sent
+- Fast and efficient
+- Standard compliant
+
+**Signed Transaction (Legacy)**:
+
+- Pre-signed Solana transaction
+- Can be settled on-chain
+- Compatible with custom servers
+- Requires more processing
+
+### Options
+
+**Show Transaction Details**
+
+**Type**: Boolean
+
+**Default**: `false`
+
+When enabled, includes additional payment metadata in output:
+
+```json
+{
+  "_x402Payment": {
+    "scheme": "exact",
+    "resource": "/api/data",
+    "network": "solana-devnet"
   }
 }
 ```
 
-### Error Types
+**Clear Saved Wallet**
 
-All error types are exported:
+**Type**: Boolean
 
-```typescript
-import {
-  X402Error,
-  X402ParseError,
-  PaymentCreationError,
-  PaymentVerificationError,
-  AssertionError,
-} from "x402test";
-```
+**Default**: `false`
 
-## TypeScript Support
+**Only for**: "Saved Wallet" mode
 
-Full TypeScript support with generics:
+Clears the saved wallet. Next run will require Wallet Manager connection to set up new wallet.
 
-```typescript
-interface ApiResponse {
-  data: string;
-  timestamp: number;
+**Reset Wallet**
+
+**Type**: Boolean
+
+**Default**: `false`
+
+**Only for**: "Auto-Generate" mode
+
+Generates a new wallet for this node instance.
+
+## Input Data
+
+### From Wallet Manager (External Mode)
+
+Expected input when using "From Wallet Manager Node" mode:
+
+```json
+{
+  "walletAddress": "9rKnvE7...",
+  "privateKey": "[1,2,3,...]",
+  "network": "solana-devnet",
+  "balances": {
+    "usdc": 10.5,
+    "sol": 1.2
+  },
+  "ready": true
 }
-
-const response = await x402<ApiResponse>(url).withPayment("0.01").execute();
-
-// response.body is typed as ApiResponse
-console.log(response.body.data);
-console.log(response.body.timestamp);
 ```
 
-## Next Steps
+### From Saved Wallet (First Time)
 
-- [Payment Methods](/api/payment) - Payment creation and handling
-- [Verification](/api/verification) - Payment verification
-- [Examples](/examples/basic-payment) - Complete examples
+On first connection from Wallet Manager, wallet data is saved:
+
+```json
+{
+  "privateKey": "[1,2,3,...]",
+  "walletAddress": "9rKnvE7...",
+  "network": "solana-devnet"
+}
+```
+
+After this, no input needed - wallet is persistent.
+
+## Output Data
+
+### Successful Payment
+
+```json
+{
+  // API response data
+  "result": "your data",
+  "status": "success",
+
+  // Payment metadata
+  "_x402Payment": {
+    "amount": "0.01",
+    "currency": "USDC",
+    "recipient": "ABC123...",
+    "sender": "9rKnvE7...",
+    "network": "solana-devnet",
+    "timestamp": "2024-01-15T10:30:00.000Z"
+  }
+}
+```
+
+### Free Endpoint
+
+If endpoint doesn't require payment:
+
+```json
+{
+  "result": "your data",
+  "status": "success"
+}
+```
+
+No `_x402Payment` field.
+
+### Error
+
+When "Continue On Fail" is enabled:
+
+```json
+{
+  "error": "Insufficient balance!",
+  "walletAddress": "9rKnvE7...",
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+
+## Using in Expressions
+
+Access data in subsequent nodes:
+
+### Check if payment was made
+
+```javascript
+{
+  {
+    $json._x402Payment !== undefined;
+  }
+}
+```
+
+### Get payment amount
+
+```javascript
+{
+  {
+    $json._x402Payment.amount;
+  }
+}
+```
+
+### Get API response
+
+```javascript
+{
+  {
+    $json.result;
+  }
+}
+{
+  {
+    $json.data;
+  }
+}
+{
+  {
+    $json;
+  }
+} // Full response
+```
+
+### Conditional logic
+
+```javascript
+{
+  {
+    $json._x402Payment ? "Paid request" : "Free request";
+  }
+}
+```
+
+## Error Messages
+
+### Insufficient Balance
+
+```
+Insufficient balance!
+
+Wallet: 9rKnvE7PVbpq4...
+USDC: 0.005
+SOL: 0.5
+
+• Get USDC: https://spl-token-faucet.com/?token-name=USDC-Dev
+• Get SOL: https://faucet.solana.com/
+
+After funding, re-run this workflow.
+```
+
+### Payment Exceeds Limit
+
+```
+Payment required (0.50 USDC) exceeds max payment limit (0.10 USDC)
+```
+
+### No Wallet Data Found
+
+```
+No wallet data found. Please connect the "x402 Wallet Manager"
+node output to this node's input.
+```
+
+### Payment Rejected
+
+```
+Payment was not accepted. Status: 400
+
+Error: Amount mismatch
+
+Check mock server logs for details.
+```
+
+## Advanced Usage
+
+### Dynamic URLs
+
+Use expressions in Resource URL:
+
+```
+https://api.example.com/{{$json.endpoint}}
+```
+
+### Conditional Payment Limits
+
+Different limits based on conditions:
+
+```
+[IF] User is premium?
+    ├─ YES → [Client] Max: 5.00
+    └─ NO → [Client] Max: 0.10
+```
+
+### Batch Requests
+
+Call multiple endpoints with same wallet:
+
+```
+[Wallet Manager]
+    ↓
+[Client 1] API A (0.01 USDC)
+    ↓
+[Client 2] API B (0.02 USDC)
+    ↓
+[Client 3] API C (0.05 USDC)
+    ↓
+Total spent: 0.08 USDC from same wallet
+```
+
+### Pass-Through Headers
+
+Forward headers from trigger:
+
+```javascript
+// In Headers configuration
+Name: {
+  {
+    $json.headerName;
+  }
+}
+Value: {
+  {
+    $json.headerValue;
+  }
+}
+```
+
+## What's Next?
+
+- [Wallet Manager](/api/wallets/) - Wallet configuration
+- [Payment Concepts](/api/payment/) - Understanding payments
+- [Examples](/examples/basic-payment/) - See it in action
+- [Error Handling](/examples/error-handling/) - Handle failures

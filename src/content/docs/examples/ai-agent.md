@@ -1,276 +1,376 @@
 ---
-title: AI Agent
-description: Build an autonomous AI agent with budget management
+title: AI Agent Workflow
+description: Build autonomous AI agents with automatic payment capabilities
 ---
 
+Learn how to build autonomous AI agents in n8n that can make payment-protected API calls automatically, perfect for AI workflows that need premium data or services.
 
-An autonomous AI agent that makes payment-protected API calls with budget management.
+## Overview
 
-## Code
+AI agents often need to:
 
-```typescript
-import { x402 } from "x402test";
+- Access premium AI APIs (GPT-4, Claude, etc.)
+- Call specialized data services
+- Process expensive computations
+- Aggregate multiple paid sources
 
-class WeatherAgent {
-  private budget: number;
-  private spent: number = 0;
+x402 Pocket Nodes enables AI agents to make these payments automatically within their budget constraints.
 
-  constructor(budget: number) {
-    this.budget = budget;
-    console.log(`✔ Weather Agent initialized with budget: ${budget} USDC`);
-  }
+## Basic AI Agent Pattern
 
-  async getWeather(city: string): Promise<any> {
-    console.log(`\n✔ Agent: Fetching weather for ${city}...`);
+```
+[Schedule Trigger] Every hour
+    ↓
+[x402 Wallet Manager]
+  - Provides wallet
+    ↓
+[AI Decision Node]
+  - Analyzes situation
+  - Decides if premium data needed
+    ↓
+[IF] Need premium analysis?
+    ├─ YES → [x402 Client] Call AI API (0.10 USDC)
+    │         ↓
+    │        [Process AI Results]
+    └─ NO → [Use Basic Logic]
+```
 
-    // Check budget before making payment
-    const costPerRequest = 0.01;
-    if (this.spent + costPerRequest > this.budget) {
-      throw new Error("✘ Budget exceeded! Cannot make request.");
-    }
+## Example: Autonomous Market Analysis Agent
 
-    try {
-      const response = await x402("http://localhost:4402/api/data")
-        .withPayment({ amount: costPerRequest.toString() })
-        .expectStatus(200)
-        .execute();
+### Goal
 
-      this.spent += costPerRequest;
-      console.log(`✔ Agent: Weather data acquired`);
-      console.log(`   Cost: ${costPerRequest} USDC`);
-      console.log(
-        `   Budget remaining: ${(this.budget - this.spent).toFixed(2)} USDC`
-      );
+Agent that:
 
-      return response.body;
-    } catch (error) {
-      console.error(`✘ Agent: Failed to get weather data`);
-      throw error;
-    }
-  }
+- Monitors market every hour
+- Decides if detailed analysis is needed
+- Automatically pays for premium AI analysis
+- Stays within daily budget
 
-  async analyzeWeekTrends(cities: string[]): Promise<void> {
-    console.log(
-      `\n✔ Agent: Analyzing weather trends for ${cities.length} cities...`
-    );
+### Workflow
 
-    const results: { city: string; data: any }[] = [];
+```
+[Schedule Trigger] Every 1 hour
+    ↓
+[HTTP Request] Get free market overview
+  - URL: https://free-market-api.com/overview
+    ↓
+[Code] Analyze if deep dive needed
+    ↓
+[IF] Significant market movement?
+    ├─ NO → [Log] "No action needed"
+    └─ YES ↓
+            [x402 Wallet Manager]
+              - Check balance
+                ↓
+            [IF] Balance > 0.15 USDC?
+                ├─ NO → [Alert] "Low balance"
+                └─ YES ↓
+                        [x402 Client] AI Analysis
+                          - URL: https://ai-api.com/analyze
+                          - Method: POST
+                          - Body: {"market": "{{$json.marketData}}"}
+                          - Max Payment: 0.10
+                            ↓
+                        [Code] Process AI insights
+                            ↓
+                        [Decision] Take action?
+                            ├─ YES → [Execute Trade/Alert]
+                            └─ NO → [Log Analysis]
+```
 
-    for (const city of cities) {
-      try {
-        const data = await this.getWeather(city);
-        results.push({ city, data });
-      } catch (error) {
-        console.log(`   Skipping ${city} due to error`);
-      }
-    }
+### Decision Logic
 
-    console.log(`\n✔ Agent: Analysis complete`);
-    console.log(`   Cities analyzed: ${results.length}`);
-    console.log(`   Total spent: ${this.spent.toFixed(2)} USDC`);
-    console.log(
-      `   Average cost per city: ${(this.spent / results.length).toFixed(
-        4
-      )} USDC`
-    );
-  }
+```javascript
+// In "Analyze if deep dive needed" node
+const marketData = $json;
+const priceChange = Math.abs(marketData.changePercent);
+const volumeChange = Math.abs(marketData.volumeChangePercent);
 
-  reportBudget() {
-    console.log(`\n✔ Budget Report:`);
-    console.log(`   Initial: ${this.budget} USDC`);
-    console.log(`   Spent: ${this.spent.toFixed(2)} USDC`);
-    console.log(`   Remaining: ${(this.budget - this.spent).toFixed(2)} USDC`);
-    console.log(
-      `   Utilization: ${((this.spent / this.budget) * 100).toFixed(1)}%`
-    );
-  }
+// Trigger deep analysis if significant movement
+if (priceChange > 5 || volumeChange > 20) {
+  return {
+    json: {
+      needsAnalysis: true,
+      reason: `Price: ${priceChange}%, Volume: ${volumeChange}%`,
+      marketData: marketData,
+    },
+  };
 }
 
-// Run the agent
-async function main() {
-  console.log("✔ Example: Autonomous Weather Agent\n");
-
-  const agent = new WeatherAgent(0.5); // 50 cents budget
-
-  await agent.analyzeWeekTrends([
-    "San Francisco",
-    "New York",
-    "London",
-    "Tokyo",
-    "Sydney",
-  ]);
-
-  agent.reportBudget();
-}
-
-main();
+return {
+  json: {
+    needsAnalysis: false,
+    reason: "Market stable",
+  },
+};
 ```
-
-## Output
-
-```
-✔ Example: Autonomous Weather Agent
-
-✔ Weather Agent initialized with budget: 0.5 USDC
-
-✔ Agent: Analyzing weather trends for 5 cities...
-
-✔ Agent: Fetching weather for San Francisco...
-✔ Agent: Weather data acquired
-   Cost: 0.01 USDC
-   Budget remaining: 0.49 USDC
-
-✔ Agent: Fetching weather for New York...
-✔ Agent: Weather data acquired
-   Cost: 0.01 USDC
-   Budget remaining: 0.48 USDC
-
-✔ Agent: Fetching weather for London...
-✔ Agent: Weather data acquired
-   Cost: 0.01 USDC
-   Budget remaining: 0.47 USDC
-
-✔ Agent: Fetching weather for Tokyo...
-✔ Agent: Weather data acquired
-   Cost: 0.01 USDC
-   Budget remaining: 0.46 USDC
-
-✔ Agent: Fetching weather for Sydney...
-✔ Agent: Weather data acquired
-   Cost: 0.01 USDC
-   Budget remaining: 0.45 USDC
-
-✔ Agent: Analysis complete
-   Cities analyzed: 5
-   Total spent: 0.05 USDC
-   Average cost per city: 0.0100 USDC
-
-✔ Budget Report:
-   Initial: 0.5 USDC
-   Spent: 0.05 USDC
-   Remaining: 0.45 USDC
-   Utilization: 10.0%
-```
-
-## Key Features
 
 ### Budget Management
 
-The agent tracks spending and prevents budget overruns:
+```javascript
+// Check daily budget
+const staticData = $getWorkflowStaticData("global");
+const today = new Date().toISOString().split("T")[0];
+const spentKey = `ai_spent_${today}`;
 
-```typescript
-if (this.spent + costPerRequest > this.budget) {
-  throw new Error("Budget exceeded!");
+const spentToday = staticData[spentKey] || 0;
+const dailyBudget = 2.0; // 2 USDC per day
+const costPerCall = 0.1;
+
+if (spentToday + costPerCall > dailyBudget) {
+  return {
+    json: {
+      error: "Daily budget exceeded",
+      spent: spentToday,
+      budget: dailyBudget,
+      action: "skip_ai_call",
+    },
+  };
+}
+
+// Track spending after call succeeds
+// (in node after x402 Client)
+if ($json._x402Payment) {
+  staticData[spentKey] = spentToday + parseFloat($json._x402Payment.amount);
 }
 ```
 
-### Autonomous Decision Making
+## Example: Multi-Step AI Pipeline
 
-The agent decides which requests to make based on budget:
+### Scenario
 
-```typescript
-async function intelligentAgent() {
-  const agent = new SmartAgent(1.0); // $1 budget
+AI pipeline with multiple stages:
 
-  // Prioritize requests
-  const tasks = [
-    { name: "Critical data", cost: 0.1, priority: 1 },
-    { name: "Nice to have", cost: 0.5, priority: 2 },
-    { name: "Optional", cost: 0.2, priority: 3 },
-  ];
+1. Content extraction (free)
+2. Initial analysis (0.02 USDC)
+3. Deep analysis if needed (0.10 USDC)
+4. Image generation if needed (0.25 USDC)
 
-  // Sort by priority
-  tasks.sort((a, b) => a.priority - b.priority);
+### Workflow
 
-  for (const task of tasks) {
-    if (agent.canAfford(task.cost)) {
-      await agent.execute(task);
-    }
-  }
+```
+[Webhook Trigger] User request
+    ↓
+[HTTP Request] Extract content (free)
+    ↓
+[x402 Wallet Manager]
+    ↓
+[x402 Client] Basic AI analysis
+  - URL: https://ai-api.com/analyze/basic
+  - Max Payment: 0.05
+  - Body: {"text": "{{$json.content}}"}
+    ↓
+[IF] Complex topic detected?
+    ├─ YES → [x402 Client] Deep analysis
+    │         - URL: https://ai-api.com/analyze/deep
+    │         - Max Payment: 0.15
+    │         - Body: {"text": "{{$json.content}}", "mode": "deep"}
+    │           ↓
+    │        [IF] Image requested?
+    │            ├─ YES → [x402 Client] Generate image
+    │            │         - URL: https://ai-api.com/generate/image
+    │            │         - Max Payment: 0.30
+    │            └─ NO → [Skip image]
+    └─ NO → [Use basic analysis]
+         ↓
+    [Format Response]
+```
+
+### Progressive Enhancement
+
+```javascript
+// Start with cheap, upgrade if needed
+const content = $json.content;
+const basicAnalysis = $node["Basic Analysis"].json;
+
+// Check if basic analysis is sufficient
+const confidence = basicAnalysis.confidence || 0;
+const complexity = basicAnalysis.complexity || 0;
+
+if (confidence > 0.8 && complexity < 0.5) {
+  // Basic analysis is good enough
+  return {
+    json: {
+      result: basicAnalysis,
+      cost: $json._x402Payment.amount,
+      tier: "basic",
+    },
+  };
+}
+
+// Need deep analysis
+return {
+  json: {
+    needsDeepAnalysis: true,
+    reason: `Low confidence: ${confidence}, High complexity: ${complexity}`,
+    basicResult: basicAnalysis,
+  },
+};
+```
+
+## Cost Tracking
+
+### Agent Spending Report
+
+```
+[Schedule Trigger] Daily at midnight
+    ↓
+[Code] Get yesterday's spending
+    ↓
+[Format Report]
+    ↓
+[Send Email] Daily AI Agent Report
+```
+
+**Report Code**:
+
+```javascript
+const staticData = $getWorkflowStaticData("global");
+const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+const spentKey = `ai_spent_${yesterday}`;
+
+const spending = staticData[spentKey] || 0;
+
+return {
+  json: {
+    date: yesterday,
+    totalSpent: spending,
+    currency: "USDC",
+    callsEstimate: Math.floor(spending / 0.1), // Assuming 0.10 per call
+    report: `AI Agent spent ${spending} USDC on ${yesterday}`,
+  },
+};
+```
+
+## Example: Autonomous Research Agent
+
+### Goal
+
+Agent that researches topics and compiles reports:
+
+- Gets topic from input
+- Searches free sources
+- If insufficient, uses paid APIs
+- Generates comprehensive report
+- Stays within budget
+
+### Implementation
+
+```
+[Manual Trigger] Research request
+    ↓
+[Set] topic = "quantum computing"
+    ↓
+[HTTP Request] Free search engine
+    ↓
+[Code] Evaluate results quality
+    ↓
+[IF] Quality < 70%?
+    ├─ YES → [x402 Wallet Manager]
+    │         ↓
+    │        [x402 Client] Academic database (0.05 USDC)
+    │         ↓
+    │        [IF] Still insufficient?
+    │            ├─ YES → [x402 Client] Premium research API (0.20 USDC)
+    │            └─ NO → [Compile Report]
+    └─ NO → [Compile Report]
+         ↓
+    [x402 Client] AI summarization (0.10 USDC)
+    - Input: All collected data
+    - Output: Comprehensive report
+         ↓
+    [Return Report]
+```
+
+### Quality Check
+
+```javascript
+// Evaluate if free sources are sufficient
+const searchResults = $json.results;
+
+const qualityMetrics = {
+  resultCount: searchResults.length,
+  avgRelevance:
+    searchResults.reduce((s, r) => s + r.relevance, 0) / searchResults.length,
+  hasAcademicSources: searchResults.some((r) => r.source === "academic"),
+  recency: searchResults.filter(
+    (r) => new Date(r.date) > new Date(Date.now() - 365 * 24 * 60 * 60 * 1000)
+  ).length,
+};
+
+const qualityScore =
+  (qualityMetrics.resultCount >= 10 ? 25 : qualityMetrics.resultCount * 2.5) +
+  qualityMetrics.avgRelevance * 50 +
+  (qualityMetrics.hasAcademicSources ? 15 : 0) +
+  (qualityMetrics.recency / searchResults.length) * 10;
+
+return {
+  json: {
+    quality: qualityScore,
+    needsPremium: qualityScore < 70,
+    metrics: qualityMetrics,
+  },
+};
+```
+
+## Best Practices for AI Agents
+
+### 1. Always Set Budget Limits
+
+```javascript
+const dailyBudget = 5.0; // 5 USDC per day
+const perCallLimit = 0.25; // 0.25 USDC per API call
+```
+
+### 2. Validate AI Responses
+
+```javascript
+// Don't blindly trust AI output
+const aiResponse = $json.result;
+
+if (!aiResponse.confidence || aiResponse.confidence < 0.7) {
+  return {
+    json: {
+      warning: "Low confidence AI response",
+      confidence: aiResponse.confidence,
+      action: "manual_review",
+    },
+  };
 }
 ```
 
-### Error Resilience
+### 3. Implement Fallbacks
 
-The agent continues operating despite individual failures:
+Always have a plan B:
 
-```typescript
-for (const city of cities) {
-  try {
-    const data = await this.getWeather(city);
-    results.push({ city, data });
-  } catch (error) {
-    console.log(`Skipping ${city} due to error`);
-    // Continue with next city
-  }
-}
+- Free API fallback
+- Cached results
+- Manual processing
+- Simplified logic
+
+### 4. Monitor Costs
+
+```
+[Every execution]
+    ↓
+[Log spending]
+    ↓
+[Check if over budget]
+    ├─ YES → [Pause agent + alert]
+    └─ NO → [Continue]
 ```
 
-## Advanced Agent
+### 5. Test on Devnet First
 
-```typescript
-class AdvancedAgent {
-  constructor(
-    private budget: number,
-    private maxCostPerRequest: number = 0.1
-  ) {}
-
-  private spent = 0;
-  private requestCount = 0;
-  private successCount = 0;
-
-  async makeRequest(url: string, price: string): Promise<any> {
-    const cost = parseFloat(price);
-
-    // Budget check
-    if (this.spent + cost > this.budget) {
-      throw new Error("Budget exceeded");
-    }
-
-    // Cost limit check
-    if (cost > this.maxCostPerRequest) {
-      console.log(
-        `Skipping expensive request: ${cost} > ${this.maxCostPerRequest}`
-      );
-      return null;
-    }
-
-    this.requestCount++;
-
-    try {
-      const response = await x402(url)
-        .withPayment(price)
-        .expectStatus(200)
-        .execute();
-
-      this.spent += cost;
-      this.successCount++;
-
-      return response.body;
-    } catch (error) {
-      console.error(`Request failed: ${error.message}`);
-      return null;
-    }
-  }
-
-  getStats() {
-    return {
-      budget: this.budget,
-      spent: this.spent,
-      remaining: this.budget - this.spent,
-      requestCount: this.requestCount,
-      successCount: this.successCount,
-      successRate:
-        this.requestCount > 0
-          ? (this.successCount / this.requestCount) * 100
-          : 0,
-      averageCost: this.successCount > 0 ? this.spent / this.successCount : 0,
-    };
-  }
-}
+```
+Development: All on devnet (free)
+Staging: Mix of devnet and small mainnet tests
+Production: Mainnet with strict limits
 ```
 
-## Next Steps
+## What's Next?
 
-- [Advanced Configuration](/advanced/configuration) - Configure agents
-- [Replay Protection](/advanced/replay-protection) - Security
+- [Error Handling](/examples/error-handling/) - Handle AI failures
+- [Multiple Endpoints](/examples/multiple-endpoints/) - Call many APIs
+- [Advanced Configuration](/advanced/configuration/) - Production setup
+- [Custom Validation](/advanced/custom-validation/) - Validate AI output
